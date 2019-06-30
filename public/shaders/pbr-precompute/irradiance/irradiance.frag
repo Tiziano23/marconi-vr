@@ -15,18 +15,19 @@ void main(void){
 	vec3 right = cross(up,normal);
 	up = cross(normal,right);
 
-	float samples = 0.0;
 	vec3 irradiance = vec3(0.0);
-	for(float theta = 0.0; theta < HALF_PI; theta += HALF_PI*0.025){
-		for(float phi = 0.0; phi < TWO_PI; phi += TWO_PI*0.01){
+	float SAMPLE_COUNT = 0.0;
+	const float STEP_PRECISION = 0.01;
+	for(float theta = 0.0; theta < HALF_PI; theta += STEP_PRECISION){
+		for(float phi = 0.0; phi < TWO_PI; phi += STEP_PRECISION){
 			vec3 vec = vec3(sin(theta)*cos(phi),sin(theta)*sin(phi),cos(theta));
-			vec3 wi = vec.x*right + vec.y*up + vec.z*normal;
+			vec3 wi = vec.x*right + vec.z*up + vec.y*normal;
 
 			irradiance += texture(enviromentMap,wi).rgb * cos(theta) * sin(theta);
-			samples++;
+			SAMPLE_COUNT++;
 		}
 	}
 
-	irradiance *= PI / samples;
+	irradiance *= PI / SAMPLE_COUNT;
 	out_Color = vec4(irradiance,1.0);
 }

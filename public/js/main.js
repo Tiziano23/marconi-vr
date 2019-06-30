@@ -223,29 +223,32 @@ async function preload(){
 	models.sheet       = await loader.loadObj('sheet','res/models/sheet.obj');
 
 	notifier.notify('Loading textures');
-	for(let i in models){
-		let m = models[i];
-		m.textures = {};
-		m.textures['normal'] = await loader.loadTexture('res/textures/'+m.id+'/bump.png');
-		m.textures['albedo'] = await loader.loadTexture('res/textures/'+m.id+'/albedo.png');
-		m.textures['roughness'] = await loader.loadTexture('res/textures/'+m.id+'/roughness.png');
+	for(let id in models){
+		models[id].textures = {};
+		models[id].textures['normal'] = await loader.loadTexture('res/textures/'+id+'/bump.png');
+		models[id].textures['albedo'] = await loader.loadTexture('res/textures/'+id+'/albedo.png');
+		models[id].textures['roughness'] = await loader.loadTexture('res/textures/'+id+'/roughness.png');
 	}
 	console.clear();
 	
-	// models.sheet.textures['albedo'] = await loader.loadTexture('res/textures/notes.png');
-
+	models.sheet.textures['albedo'] = await loader.loadTexture('res/textures/notes.png');
 	models.floor.textures['normal'] = await loader.loadTexture('res/textures/floor/tiles/bump.png');
 	models.floor.textures['albedo'] = await loader.loadTexture('res/textures/floor/tiles/albedo.png');
 	models.floor.textures['roughness'] = await loader.loadTexture('res/textures/floor/tiles/roughness.png');
-	// models.floor.textures['occlusion'] = await loaderwwwww.loadTexture('res/textures/floor/grass/ao.png');
+	// models.floor.textures['occlusion'] = await loader.loadTexture('res/textures/floor/grass/ao.png');
 
 	notifier.notify('Loading enviroment');
 	// window.enviromentMap = loader.createEnviromentMap(4,new Vector3f(0.5,0.6,1.0),new Vector3f(1,1,1));
 	window.enviromentMap = await loader.loadEnviromentMapHDR('res/skybox/indoor/2k.hdr');	
-	// await window.precomputedIrradianceMap.setEnviromentMap(envMap);
-	// await window.precomputedPrefilteredMap.setEnviromentMap(envMap);
+	
+	window.precomputedIrradianceMap = new IrradianceMap();
+	window.precomputedPrefilteredMap = new PrefilteredMap();
+	await window.precomputedIrradianceMap.setEnviromentMap(window.enviromentMap);
+	await window.precomputedPrefilteredMap.setEnviromentMap(window.enviromentMap);
 
-	contentLoaded();
+	models.cube = await loader.loadObj('cube', 'res/models/cube.obj');
+	
+	setTimeout(contentLoaded, 3000);
 	main();
 }
 
@@ -260,8 +263,10 @@ function main(){
 	window.camera = new Camera();
 	camera.setViewAnchor(player);
 
-	window.precomputedIrradianceMap = new IrradianceMap();
-	window.precomputedPrefilteredMap = new PrefilteredMap();
+	for (let id in models) {
+		models[id].material.setIrradianceMap(precomputedIrradianceMap);
+		models[id].material.setPrefilteredMap(precomputedPrefilteredMap);
+	}
 
 	scene.on('skyboxUpdated',() => {
 		window.precomputedIrradianceMap.setEnviromentMap(scene.skybox.enviromentMap);
@@ -269,34 +274,36 @@ function main(){
 	});
 
 	// Entities
-		const floor = new Entity(models.floor,new Vector3f(0,0,0),new Vector3f(),1);
-		floor.model.material.setNormalMap(models.floor.textures['normal']);
-		floor.model.material.setDiffuseMap(models.floor.textures['albedo']);
-		floor.model.material.setRoughnessMap(models.floor.textures['roughness']);
-		floor.model.material.setIrradianceMap(precomputedIrradianceMap);
-		floor.model.material.setPrefilteredMap(precomputedPrefilteredMap);
-		scene.addEntity(floor);
+		const cube = new Entity(models.sphere, new Vector3f(0,4.25,-5), new Vector3f(), 0.5);
+		scene.addEntity(cube);
+		// const floor = new Entity(models.floor,new Vector3f(0,0,0),new Vector3f(),1);
+		// floor.model.material.setNormalMap(models.floor.textures['normal']);
+		// floor.model.material.setDiffuseMap(models.floor.textures['albedo']);
+		// floor.model.material.setRoughnessMap(models.floor.textures['roughness']);
+		// floor.model.material.setIrradianceMap(precomputedIrradianceMap);
+		// floor.model.material.setPrefilteredMap(precomputedPrefilteredMap);
+		// scene.addEntity(floor);
 	
-		const blackboard = new Entity(models.blackboard,new Vector3f(0,6.5,-49.5),new Vector3f(),1);
-		blackboard.model.material.setDiffuseMap(models.blackboard.textures['albedo']);
-		blackboard.model.material.setRoughnessMap(models.blackboard.textures['roughness']);
-		blackboard.model.material.setIrradianceMap(precomputedIrradianceMap);
-		blackboard.model.material.setPrefilteredMap(precomputedPrefilteredMap);
-		scene.addEntity(blackboard);
+		// const blackboard = new Entity(models.blackboard,new Vector3f(0,6.5,-49.5),new Vector3f(),1);
+		// blackboard.model.material.setDiffuseMap(models.blackboard.textures['albedo']);
+		// blackboard.model.material.setRoughnessMap(models.blackboard.textures['roughness']);
+		// blackboard.model.material.setIrradianceMap(precomputedIrradianceMap);
+		// blackboard.model.material.setPrefilteredMap(precomputedPrefilteredMap);
+		// scene.addEntity(blackboard);
 
-		const teacherDesk = new Entity(models.teacherDesk,new Vector3f(0,0,-35),new Vector3f(0,Math.PI,0),1);
-		teacherDesk.model.material.setDiffuseMap(models.teacherDesk.textures['albedo']);
-		teacherDesk.model.material.setRoughnessMap(models.teacherDesk.textures['roughness']);
-		teacherDesk.model.material.setIrradianceMap(precomputedIrradianceMap);
-		teacherDesk.model.material.setPrefilteredMap(precomputedPrefilteredMap);
-		scene.addEntity(teacherDesk);
+		// const teacherDesk = new Entity(models.teacherDesk,new Vector3f(0,0,-35),new Vector3f(0,Math.PI,0),1);
+		// teacherDesk.model.material.setDiffuseMap(models.teacherDesk.textures['albedo']);
+		// teacherDesk.model.material.setRoughnessMap(models.teacherDesk.textures['roughness']);
+		// teacherDesk.model.material.setIrradianceMap(precomputedIrradianceMap);
+		// teacherDesk.model.material.setPrefilteredMap(precomputedPrefilteredMap);
+		// scene.addEntity(teacherDesk);
 
-		const teacherChair = new Entity(models.chair,new Vector3f(0,0,-37.5),new Vector3f(),1);
-		teacherChair.model.material.setDiffuseMap(models.chair.textures['albedo']);
-		teacherChair.model.material.setRoughnessMap(models.chair.textures['roughness']);
-		teacherChair.model.material.setIrradianceMap(precomputedIrradianceMap);
-		teacherChair.model.material.setPrefilteredMap(precomputedPrefilteredMap);
-		scene.addEntity(teacherChair);
+		// const teacherChair = new Entity(models.chair,new Vector3f(0,0,-37.5),new Vector3f(),1);
+		// teacherChair.model.material.setDiffuseMap(models.chair.textures['albedo']);
+		// teacherChair.model.material.setRoughnessMap(models.chair.textures['roughness']);
+		// teacherChair.model.material.setIrradianceMap(precomputedIrradianceMap);
+		// teacherChair.model.material.setPrefilteredMap(precomputedPrefilteredMap);
+		// scene.addEntity(teacherChair);
 
 		// const notes = new Entity(models.sheet,new Vector3f(-4,4,-33.5),new Vector3f(0,Math.PI/8,0),1);
 		// notes.model.material.setDiffuseMap(models.sheet.textures['albedo']);
@@ -305,24 +312,24 @@ function main(){
 		// notes.model.material.setPrefilteredMap(precomputedPrefilteredMap);
 		// scene.addEntity(notes);
 
-		const desks = [];
-		const origin = new Vector3f(-5,0,10);
-		for(let i = -2;i <= 2;i++){
-			for(let j = -2;j <= 2;j++){
-				let d = new Entity(models.desk,new Vector3f(origin.x+i*10,origin.y,origin.z+j*10),new Vector3f(),1);
-				let c = new Entity(models.chair,new Vector3f(origin.x+i*10,origin.y,origin.z+j*10+2),new Vector3f(0,Math.PI,0),1);
-				d.model.material.setDiffuseMap(models.desk.textures['albedo']);
-				d.model.material.setRoughnessMap(models.desk.textures['roughness']);
-				d.model.material.setIrradianceMap(precomputedIrradianceMap);
-				d.model.material.setPrefilteredMap(precomputedPrefilteredMap);
-				scene.addEntity(d);
-				c.model.material.setDiffuseMap(models.chair.textures['albedo']);
-				c.model.material.setRoughnessMap(models.chair.textures['roughness']);
-				c.model.material.setIrradianceMap(precomputedIrradianceMap);
-				c.model.material.setPrefilteredMap(precomputedPrefilteredMap);
-				scene.addEntity(c);
-			}
-		}
+		// const desks = [];
+		// const origin = new Vector3f(-5,0,10);
+		// for(let i = -2;i <= 2;i++){
+		// 	for(let j = -2;j <= 2;j++){
+		// 		let d = new Entity(models.desk,new Vector3f(origin.x+i*10,origin.y,origin.z+j*10),new Vector3f(),1);
+		// 		let c = new Entity(models.chair,new Vector3f(origin.x+i*10,origin.y,origin.z+j*10+2),new Vector3f(0,Math.PI,0),1);
+		// 		d.model.material.setDiffuseMap(models.desk.textures['albedo']);
+		// 		d.model.material.setRoughnessMap(models.desk.textures['roughness']);
+		// 		d.model.material.setIrradianceMap(precomputedIrradianceMap);
+		// 		d.model.material.setPrefilteredMap(precomputedPrefilteredMap);
+		// 		scene.addEntity(d);
+		// 		c.model.material.setDiffuseMap(models.chair.textures['albedo']);
+		// 		c.model.material.setRoughnessMap(models.chair.textures['roughness']);
+		// 		c.model.material.setIrradianceMap(precomputedIrradianceMap);
+		// 		c.model.material.setPrefilteredMap(precomputedPrefilteredMap);
+		// 		scene.addEntity(c);
+		// 	}
+		// }
 	// Lights
 		// scene.addLight(new PointLight(new Vector3f(-40,35,-40),new Vector3f(1,0,0),10));
 		// scene.addLight(new PointLight(new Vector3f(-40,35, 40),new Vector3f(0,1,0),10));
@@ -338,12 +345,13 @@ function main(){
 	draw();
 }
 
-function draw(){
+function draw(options){
+	options = options || {};
 	display.update();
 	input.update();
 	socketUpdate();
 
-	display.id = window.requestAnimationFrame(draw);
+	if(!options.once)display.id = window.requestAnimationFrame(draw);
 
 	//-- Game Logic --//
 	camera.update();

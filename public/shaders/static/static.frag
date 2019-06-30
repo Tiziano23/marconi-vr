@@ -106,9 +106,6 @@ uniform PBRData pbr;
 
 	    return normalize(sampleVec);
 	}
-
-
-
 void main(void) {
 	vec3  albedo    = pow(texture(material.diffuseMap,pass_texture).rgb,vec3(2.2));
 	float metalness = texture(material.metalnessMap,pass_texture).r;
@@ -125,23 +122,23 @@ void main(void) {
 	F0 = mix(F0,albedo,metalness);
 
 	//-- BRDF --//
-		vec2 BRDF = vec2(0,0);
-		const uint SAMPLE_COUNT = 32u;
-		for(uint i = 0u; i < SAMPLE_COUNT; ++i){
-			vec3 H = ImportanceSampleGGX(Hammersley(i, SAMPLE_COUNT), N, roughness);
-			vec3 L  = reflect(-V,H);
-			float NdotL = max(dot(N,L), 0.0);
-			float NdotH = max(dot(N,H), 0.0);
-			float VdotH = max(dot(V,H), 0.0);
-			if(NdotL > 0.0){
-				float G = G(N, V, L,(roughness*roughness)/2.0);
-				float G_Vis = (G * VdotH) / (NdotH * NdotV);
-				float Fc = pow(1.0 - VdotH, 5.0);
-				BRDF.x += (1.0 - Fc) * G_Vis;
-				BRDF.y += Fc * G_Vis;
-			}
-		}
-		BRDF /= float(SAMPLE_COUNT);
+		// vec2 BRDF = vec2(0,0);
+		// const uint SAMPLE_COUNT = 32u;
+		// for(uint i = 0u; i < SAMPLE_COUNT; ++i){
+		// 	vec3 H = ImportanceSampleGGX(Hammersley(i, SAMPLE_COUNT), N, roughness);
+		// 	vec3 L  = reflect(-V,H);
+		// 	float NdotL = max(dot(N,L), 0.0);
+		// 	float NdotH = max(dot(N,H), 0.0);
+		// 	float VdotH = max(dot(V,H), 0.0);
+		// 	if(NdotL > 0.0){
+		// 		float G = G(N, V, L,(roughness*roughness)/2.0);
+		// 		float G_Vis = (G * VdotH) / (NdotH * NdotV);
+		// 		float Fc = pow(1.0 - VdotH, 5.0);
+		// 		BRDF.x += (1.0 - Fc) * G_Vis;
+		// 		BRDF.y += Fc * G_Vis;
+		// 	}
+		// }
+		// BRDF /= float(SAMPLE_COUNT);
 	
 	//-- Scene Lighting --//
 		vec3 L0 = vec3(0.0);
@@ -171,11 +168,11 @@ void main(void) {
 	kD *= 1.0 - metalness;
 	
 	float mipLevel = roughness * 4.0;
-	vec3 irradiance = texture(pbr.irradiance,surfaceNormal).rgb;
+	vec3 irradiance = texture(pbr.irradiance,N).rgb;
 	vec3 prefiltered = textureLod(pbr.prefiltered,R,mipLevel).rgb;
 
 	vec3 diffuse = kD * albedo * irradiance;
-	vec3 specular = (kS /** BRDF.x + BRDF.y*/) * prefiltered;
+	vec3 specular = kS * prefiltered;
 	vec3 color = (diffuse + specular + L0) * ao;
 
 	out_Color = vec4(color,1.0);
@@ -186,14 +183,16 @@ void main(void) {
 	//-- Debug --//
 		// out_Color = vec4(vec3(G(N, V, V, (roughness*roughness)/2.0)),1.0);
 
-		// out_Color = vec4(irradiance, 1.0);
+
+		// out_Color = textureLod(pbr.enviroment,N,0.0);
+		out_Color = vec4(gammaCorrection(irradiance), 1.0);
 		// out_Color = vec4(prefiltered,1.0);
 		// out_Color = vec4(specular, 1.0);
 		// out_Color = vec4(diffuse,1.0);
 		// out_Color = vec4(L0,1.0);
 
 		// out_Color = vec4(F0,1.0);
-		// out_Color = vec4(N,1.0);
+		// out_Color = vec4((N + 1.0) * 0.5,1.0);
 
 		// out_Color = vec4(albedo,1.0);
 		// out_Color = vec4(vec3(roughness),1.0);

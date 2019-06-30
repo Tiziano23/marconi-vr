@@ -237,7 +237,7 @@ class Loader {
 		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
-		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR); 
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); 
 		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 		gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 		return textureID;
@@ -308,8 +308,8 @@ class Loader {
 			img.onload = function(){
 				gl.bindTexture(gl.TEXTURE_2D,textureID);
 				gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB16F,img.width,img.height,0,gl.RGB,gl.FLOAT,img.dataFloat);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 				gl.bindTexture(gl.TEXTURE_2D, null);
@@ -945,11 +945,10 @@ class Loader {
 	}
 	class EquitangularMap{
 		constructor(){
-			this.res = 1024;
+			this.res = 4096;
 			this.model = new Cube(1);
 			this.fbo = gl.createFramebuffer();
-			this.cbo = gl.createRenderbuffer();
-			this.dbo = gl.createRenderbuffer();
+			this.rbo = gl.createRenderbuffer();
 			this.textureID = loader.createEmptyEnviromentMap(this.res);
 			this.views = [
 				mat4.lookAt(mat4.create(),[0,0,0],[ 1, 0, 0],[0,-1, 0]),
@@ -959,15 +958,12 @@ class Loader {
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0, 1],[0,-1, 0]),
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0,-1],[0,-1, 0])
 			]
-			gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.fbo);
-			gl.bindRenderbuffer(gl.RENDERBUFFER, this.cbo);
-			gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA32F, this.res, this.res);
-			gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, this.cbo);
-			gl.bindRenderbuffer(gl.RENDERBUFFER, this.dbo);
+			gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+			gl.bindRenderbuffer(gl.RENDERBUFFER, this.rbo);
 			gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, this.res, this.res);
-			gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.dbo);
+			gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.rbo);			
 			gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-			gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		}
 		async setEquitangularMap(texture){
 			this.enviromentMap = texture;
@@ -982,12 +978,11 @@ class Loader {
 			gl.activeTexture(gl.TEXTURE0);
 			gl.bindTexture(gl.TEXTURE_2D,this.enviromentMap);
 			gl.viewport(0,0,this.res,this.res);
-			gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.fbo);
+			gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
 			for(let i = 0;i < 6;i++){
 				this.shader.loadViewMatrix(this.views[i]);
-				gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,this.textureID,0);
+				gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,this.textureID,0);
 				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
 				gl.bindBuffer(gl.ARRAY_BUFFER, this.model.vertices);
 				gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
 			 	gl.enableVertexAttribArray(0);
@@ -995,9 +990,8 @@ class Loader {
 				gl.disableVertexAttribArray(0);
 				gl.bindBuffer(gl.ARRAY_BUFFER,null);
 			}
-			gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 			gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.textureID);
-			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
 			gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
 			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 		}
@@ -1007,8 +1001,7 @@ class Loader {
 			this.res = 32;
 			this.model = new Cube(1);
 			this.fbo = gl.createFramebuffer();
-			this.cbo = gl.createRenderbuffer();
-			this.dbo = gl.createRenderbuffer();
+			this.rbo = gl.createRenderbuffer();
 			this.textureID = loader.createEmptyEnviromentMap(this.res);
 			this.views = [
 				mat4.lookAt(mat4.create(),[0,0,0],[ 1, 0, 0],[0,-1, 0]),
@@ -1018,15 +1011,17 @@ class Loader {
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0, 1],[0,-1, 0]),
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0,-1],[0,-1, 0])
 			]
-			gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.fbo);
-			gl.bindRenderbuffer(gl.RENDERBUFFER, this.cbo);
-			gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA32F, this.res, this.res);
-			gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, this.rbo);
-			gl.bindRenderbuffer(gl.RENDERBUFFER, this.dbo);
+			
+			gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.textureID);
+			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+
+			gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+			gl.bindRenderbuffer(gl.RENDERBUFFER, this.rbo);
 			gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, this.res, this.res);
-			gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.dbo);
+			gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.rbo);
 			gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-			gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		}
 		async setEnviromentMap(texture){
 			this.enviromentMap = texture;
@@ -1040,12 +1035,11 @@ class Loader {
 			this.shader.loadProjectionMatrix(projectionMatrix);
 			gl.activeTexture(gl.TEXTURE0);
 			gl.bindTexture(gl.TEXTURE_CUBE_MAP,this.enviromentMap);
-
 			gl.viewport(0,0,this.res,this.res);
 			gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
 			for(let i = 0;i < 6;i++){
 				this.shader.loadViewMatrix(this.views[i]);
-				gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,this.textureID,0);
+				gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,this.textureID,0);
 				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 				gl.bindBuffer(gl.ARRAY_BUFFER, this.model.vertices);
@@ -1056,11 +1050,6 @@ class Loader {
 				gl.bindBuffer(gl.ARRAY_BUFFER,null);
 			}
 			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.textureID);
-			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-			gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 		}
 	}
 	class PrefilteredMap {
@@ -1068,10 +1057,9 @@ class Loader {
 			this.res = 512;
 			this.model = new Cube(1);
 			this.fbo = gl.createFramebuffer();
-			this.cbo = gl.createRenderbuffer();
-			this.dbo = gl.createRenderbuffer();
+			this.rbo = gl.createRenderbuffer();
 			this.textureID = loader.createEmptyEnviromentMap(this.res);
-			this.mipLevels = 4;
+			this.mipLevels = 10;
 			this.views = [
 				mat4.lookAt(mat4.create(),[0,0,0],[ 1, 0, 0],[0,-1, 0]),
 				mat4.lookAt(mat4.create(),[0,0,0],[-1, 0, 0],[0,-1, 0]),
@@ -1080,19 +1068,9 @@ class Loader {
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0, 1],[0,-1, 0]),
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0,-1],[0,-1, 0])
 			]
-			gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.fbo);
-			gl.bindRenderbuffer(gl.RENDERBUFFER, this.cbo);
-			gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA32F, this.res, this.res);
-			gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, this.cbo);
-			gl.bindRenderbuffer(gl.RENDERBUFFER, this.dbo);
-			gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, this.res, this.res);
-			gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.dbo);
-			gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-			gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
-
 			gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.textureID);
-			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
 			gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 		}
 		async setEnviromentMap(texture){
 			this.enviromentMap = texture;
@@ -1105,20 +1083,15 @@ class Loader {
 			this.shader.start();
 			this.shader.loadProjectionMatrix(projectionMatrix);
 			gl.activeTexture(gl.TEXTURE0);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP,this.enviromentMap);
-
+			gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.enviromentMap);
 			gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
 			for(let mip = 0; mip < this.mipLevels; mip++){
 				let size = this.res * Math.pow(0.5,mip);
 				let roughness = mip / (this.mipLevels-1);
 				this.shader.loadFloat(gl.getUniformLocation(this.shader.programID, 'roughness'),roughness);
-				
-				gl.bindRenderbuffer(gl.RENDERBUFFER, this.cbo);
-				gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA32F, size, size);
-				gl.bindRenderbuffer(gl.RENDERBUFFER, this.dbo);
+				gl.bindRenderbuffer(gl.RENDERBUFFER, this.rbo);
 				gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, size, size);
 				gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-
 				gl.viewport(0,0,size,size);
 				for(let i = 0;i < 6;i++){
 					this.shader.loadViewMatrix(this.views[i]);
@@ -1195,7 +1168,7 @@ class Loader {
 			this.diffuseMap   = diffuseMap   || loader.createTextureFromColor(new Vector3f(0.8,0.8,0.8));
 			this.normalMap    = normalMap    || loader.createTextureFromColor(new Vector3f(0.5,0.5,1.0));
 			this.metalnessMap = metalnessMap || loader.createTextureFromColor(new Vector3f(0.0,0.0,0.0));
-			this.roughnessMap = roughnessMap || loader.createTextureFromColor(new Vector3f(0.0,0.0,0.0));
+			this.roughnessMap = roughnessMap || loader.createTextureFromColor(new Vector3f(0.5,0.0,0.0));
 			this.occlusionMap = occlusionMap || loader.createTextureFromColor(new Vector3f(1.0,1.0,1.0));
 			this.irradianceMap = new IrradianceMap();
 			this.prefilteredMap = new PrefilteredMap();

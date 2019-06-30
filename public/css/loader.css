@@ -7,6 +7,15 @@
 	position:absolute;
 	transition:opacity 1.5s, visibility 1.5s;
 }
+#loader::before {
+	content:"";
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	position: fixed;
+	background: #333;
+}
 #loader .spinner {
 	width:50px;
 	height:50px;
@@ -66,23 +75,6 @@
 	filter:blur(50px);
 	transition:opacity 0.5s;
 	background:rgba(255,255,255,0.05);
-}
-
-.canvas-overlay {
-	opacity:0;
-	z-index:1;
-	top:0;
-	left:0;
-	width:100vw;
-	height:100vh;
-	background:#333;
-	position:absolute;
-	visibility:hidden;
-	transition:opacity 1.5s, visibility 1.5s;
-}
-#display.loading ~ .canvas-overlay{
-	opacity:1;
-	visibility:visible;
 }
 
 @keyframes X {
