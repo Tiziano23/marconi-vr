@@ -318,26 +318,26 @@ class Loader {
 	static createEnviromentMap(resolution, sky, fog) {
 		let model = new Cube(1);
 		let fbo = gl.createFramebuffer();
-		let texture = loader.createEmptyEnviromentMap(resolution);
+		let texture = Loader.createEmptyEnviromentMap(resolution);
 		let shader = new ShaderProgram(
 			`#version 300 es
-					in vec3 position;
-					out float height;
-					uniform mat4 viewMatrix;
-					uniform mat4 projectionMatrix;
-					void main(void){
-						height = (position.y + 1.0) / 2.0;
-						gl_Position = projectionMatrix * viewMatrix * vec4(position,1.0);
-					}`,
+			in vec3 position;
+			out float height;
+			uniform mat4 viewMatrix;
+			uniform mat4 projectionMatrix;
+			void main(void){
+				height = (position.y + 1.0) / 2.0;
+				gl_Position = projectionMatrix * viewMatrix * vec4(position,1.0);
+			}`,
 			`#version 300 es
-					precision mediump float;
-					in float height;
-					out vec4 out_Color;
-					uniform vec3 fogColor;
-					uniform vec3 skyColor;
-					void main(void){
-						out_Color = vec4(mix(fogColor,skyColor,height),1.0);
-					}`
+			precision mediump float;
+			in float height;
+			out vec4 out_Color;
+			uniform vec3 fogColor;
+			uniform vec3 skyColor;
+			void main(void){
+				out_Color = vec4(mix(fogColor,skyColor,height),1.0);
+			}`
 		);
 		let projectionMatrix = mat4.perspective(mat4.create(), Math.PI / 2, 1, 0.1, 10);
 		let views = [
@@ -348,14 +348,12 @@ class Loader {
 			mat4.lookAt(mat4.create(), [0, 0, 0], [0, 0, 1], [0, -1, 0]),
 			mat4.lookAt(mat4.create(), [0, 0, 0], [0, 0, -1], [0, -1, 0])
 		];
-		
 		gl.useProgram(shader.programID);
 		gl.bindAttribLocation(shader.programID, 0, 'position');
 		gl.uniform3f(gl.getUniformLocation(shader.programID, 'fogColor'), fog.x, fog.y, fog.z);
 		gl.uniform3f(gl.getUniformLocation(shader.programID, 'skyColor'), sky.x, sky.y, sky.z);
 		gl.uniformMatrix4fv(gl.getUniformLocation(shader.programID, 'projectionMatrix'), false, projectionMatrix);
 		gl.viewport(0, 0, resolution, resolution);
-
 		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 		for (let i = 0; i < 6; i++) {
 			gl.uniformMatrix4fv(gl.getUniformLocation(shader.programID, 'viewMatrix'), false, views[i]);
@@ -369,7 +367,6 @@ class Loader {
 			gl.bindBuffer(gl.ARRAY_BUFFER, null);
 		}
 		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
 		return texture;
 	}
 	static loadEnviromentMapHDR(textureUrl) {
@@ -1352,11 +1349,11 @@ class Loader {
 			this.rotation = new Vector3f(0,0,0);
 			this.velocity = new Vector3f();
 			this.acceleration = new Vector3f();
-			this.anchorPoint = new Vector3f(x,y+5,z);
+			this.anchorPoint = new Vector3f(x,y,z);
 
 			this.crouched = false;
-			this.viewHeight = 5
-			this.crouchHeight = 3.5;
+			this.viewHeight = 1.75
+			this.crouchHeight = 1.5;
 
 			this.movementSpeed = 100;
 			this.speedMtl = 1;
