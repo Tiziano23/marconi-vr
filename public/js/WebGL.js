@@ -43,8 +43,8 @@ const CUBE = [
 	1, -1,  1
 ];
 
-async function fetchShader(vertexUrl,fragmentUrl){
-	return await new Promise(async resolve => {
+function fetchShader(vertexUrl,fragmentUrl){
+	return new Promise(async resolve => {
 		let vertexSource = await fetch(vertexUrl).then(async res => {
 			return await res.body.getReader().read().then(buffer => {
 				return new TextDecoder("utf-8").decode(buffer.value);
@@ -192,63 +192,135 @@ class Loader {
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,null);
 		return buff;
 	}
-	async loadTexture(textureUrl){
-		return new Promise(resolve => {
+	async loadObj(id, filename) {
+		return await fetch(filename).then(res => {
+			const reader = res.body.getReader();
+			let file = "";
+			let vertices = new Array();
+			let textures = new Array();
+			let normals = new Array();
+			let indices = new Array();
+			return reader.read().then(function readChunk(buffer) {
+					if (buffer.done) return file;
+					file += new TextDecoder('utf-8').decode(buffer.value);
+					return reader.read().then(readChunk);
+				})
+				.then(file => {
+					file = file.trim() + '\n';
+					const lines = file.split('\n');
+					lines.forEach(line => {
+						line = line.trim();
+						let values = line.split(' ');
+						let token = values.shift().trim();
+						switch (token) {
+							case 'v':
+								vertices.push([parseFloat(values[0]), parseFloat(values[1]), parseFloat(values[2])]);
+								break;
+							case 'vt':
+								textures.push([parseFloat(values[0]), parseFloat(values[1])]);
+								break;
+							case 'vn':
+								normals.push([parseFloat(values[0]), parseFloat(values[1]), parseFloat(values[2])]);
+								break;
+							case 'f':
+								for (let i = 0; i < values.length; i++) {
+									let vertexData = values[i].split('/');
+									indices.push({
+										vertex: parseInt(vertexData[0]) - 1,
+										texture: parseInt(vertexData[1]) - 1,
+										normal: parseInt(vertexData[2]) - 1,
+										hashCode: vertexData[0] + '/' + vertexData[1] + '/' + vertexData[2]
+									});
+								}
+								break;
+						}
+					})
+					let sortedVertices = new Array();
+					let sortedTextures = new Array();
+					let sortedNormals = new Array();
+					let sortedIndices = new Array();
+					let indexMap = new Array();
+					for (let i = 0; i < indices.length; i++) {
+						let index = indices[i];
+						let currentVertex = vertices[index.vertex];
+						let currentTexture = textures[index.texture];
+						let currentNormal = normals[index.normal];
+
+						if (index.hashCode in indexMap) {
+							sortedIndices.push(indexMap[index.hashCode]);
+						} else {
+							indexMap[index.hashCode] = sortedVertices.length / 3;
+							sortedIndices.push(sortedVertices.length / 3);
+
+							sortedVertices.push(currentVertex[0], currentVertex[1], currentVertex[2]);
+							sortedTextures.push(currentTexture[0], 1 - currentTexture[1]);
+							sortedNormals.push(currentNormal[0], currentNormal[1], currentNormal[2]);
+						}
+					}
+					return this.createModel(id, sortedVertices, sortedIndices, sortedTextures, sortedNormals);
+				})
+				.catch(e => {
+					console.error(e)
+				});
+		});
+	}
+
+	static loadTexture(textureUrl){
+		return new Promise((resolve,error) => {
 			const textureID = gl.createTexture();
 			gl.bindTexture(gl.TEXTURE_2D,textureID);
 			gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
-
 			let img = new Image();
+			img.src = textureUrl;
 			img.onload = () => {
-				gl.bindTexture(gl.TEXTURE_2D,textureID);
-				gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,img.width,img.height,0,gl.RGBA,gl.UNSIGNED_BYTE,img);
+				gl.bindTexture(gl.TEXTURE_2D, textureID);
+				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, img.width, img.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-				if(gl.getExtension('EXT_texture_filter_anisotropic')){
+				if (gl.getExtension('EXT_texture_filter_anisotropic')) {
 					let ext = gl.getExtension('EXT_texture_filter_anisotropic');
-					let amount = Math.min(4,gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT));
+					let amount = Math.min(4, gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT));
 					gl.texParameterf(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, amount);
 				}
 				gl.generateMipmap(gl.TEXTURE_2D);
 				gl.bindTexture(gl.TEXTURE_2D, null);
-				resolve(textureID);
-			};
-			img.onerror = () => {
-				resolve(textureID);
+				resolve(textureID)
 			}
-			img.src = textureUrl;
+			img.onerror = () => {
+				error({msg:'Unable to load texture: file not found!'});
+			}
 		});
 	}
-	createTextureFromColor(color){
+	static createTextureFromColor(color) {
 		const texture = gl.createTexture();
-		gl.bindTexture(gl.TEXTURE_2D,texture);
-		gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255*color.x,255*color.y,255*color.z,255]));
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255 * color.x, 255 * color.y, 255 * color.z, 255]));
 		gl.bindTexture(gl.TEXTURE_2D, null);
 		return texture;
 	}
-	createEmptyEnviromentMap(resolution){
+
+	static createEmptyEnviromentMap(resolution) {
 		const textureID = gl.createTexture();
-		gl.bindTexture(gl.TEXTURE_CUBE_MAP,textureID);
-		for(let i = 0;i < 6;i++){
-			gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,0,gl.RGBA16F,resolution,resolution,0,gl.RGBA,gl.FLOAT,null);
+		gl.bindTexture(gl.TEXTURE_CUBE_MAP, textureID);
+		for (let i = 0; i < 6; i++) {
+			gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, gl.RGBA16F, resolution, resolution, 0, gl.RGBA, gl.FLOAT, null);
 		}
 		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
-		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); 
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 		gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 		return textureID;
 	}
-	createEnviromentMap(resolution,sky,fog){
-		let texture = loader.createEmptyEnviromentMap(resolution);
+	static createEnviromentMap(resolution, sky, fog) {
 		let model = new Cube(1);
 		let fbo = gl.createFramebuffer();
-		let cbo = gl.createRenderbuffer();
+		let texture = loader.createEmptyEnviromentMap(resolution);
 		let shader = new ShaderProgram(
-					`#version 300 es
+			`#version 300 es
 					in vec3 position;
 					out float height;
 					uniform mat4 viewMatrix;
@@ -257,7 +329,7 @@ class Loader {
 						height = (position.y + 1.0) / 2.0;
 						gl_Position = projectionMatrix * viewMatrix * vec4(position,1.0);
 					}`,
-					`#version 300 es
+			`#version 300 es
 					precision mediump float;
 					in float height;
 					out vec4 out_Color;
@@ -267,153 +339,80 @@ class Loader {
 						out_Color = vec4(mix(fogColor,skyColor,height),1.0);
 					}`
 		);
-		let projectionMatrix = mat4.perspective(mat4.create(),Math.PI/2,1,0.1,10);
+		let projectionMatrix = mat4.perspective(mat4.create(), Math.PI / 2, 1, 0.1, 10);
 		let views = [
-			mat4.lookAt(mat4.create(),[0,0,0],[ 1, 0, 0],[0,-1, 0]),
-			mat4.lookAt(mat4.create(),[0,0,0],[-1, 0, 0],[0,-1, 0]),
-			mat4.lookAt(mat4.create(),[0,0,0],[ 0, 1, 0],[0, 0, 1]),
-			mat4.lookAt(mat4.create(),[0,0,0],[ 0,-1, 0],[0, 0,-1]),
-			mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0, 1],[0,-1, 0]),
-			mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0,-1],[0,-1, 0])
+			mat4.lookAt(mat4.create(), [0, 0, 0], [1, 0, 0], [0, -1, 0]),
+			mat4.lookAt(mat4.create(), [0, 0, 0], [-1, 0, 0], [0, -1, 0]),
+			mat4.lookAt(mat4.create(), [0, 0, 0], [0, 1, 0], [0, 0, 1]),
+			mat4.lookAt(mat4.create(), [0, 0, 0], [0, -1, 0], [0, 0, -1]),
+			mat4.lookAt(mat4.create(), [0, 0, 0], [0, 0, 1], [0, -1, 0]),
+			mat4.lookAt(mat4.create(), [0, 0, 0], [0, 0, -1], [0, -1, 0])
 		];
+		
 		gl.useProgram(shader.programID);
-		gl.bindAttribLocation(shader.programID,0,'position');
-		gl.uniform3f(gl.getUniformLocation(shader.programID,'fogColor'),fog.x,fog.y,fog.z);
-		gl.uniform3f(gl.getUniformLocation(shader.programID,'skyColor'),sky.x,sky.y,sky.z);
-		gl.uniformMatrix4fv(gl.getUniformLocation(shader.programID,'projectionMatrix'), false, projectionMatrix);
-		gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,fbo);
-		gl.bindRenderbuffer(gl.RENDERBUFFER,cbo);
-		gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA32F, resolution, resolution);
-		gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, cbo);
-		gl.viewport(0,0,resolution,resolution);
-		for(let i = 0;i < 6;i++){
-			gl.uniformMatrix4fv(gl.getUniformLocation(shader.programID,'viewMatrix'), false, views[i]);
-			gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X + i,texture,0);
+		gl.bindAttribLocation(shader.programID, 0, 'position');
+		gl.uniform3f(gl.getUniformLocation(shader.programID, 'fogColor'), fog.x, fog.y, fog.z);
+		gl.uniform3f(gl.getUniformLocation(shader.programID, 'skyColor'), sky.x, sky.y, sky.z);
+		gl.uniformMatrix4fv(gl.getUniformLocation(shader.programID, 'projectionMatrix'), false, projectionMatrix);
+		gl.viewport(0, 0, resolution, resolution);
+
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+		for (let i = 0; i < 6; i++) {
+			gl.uniformMatrix4fv(gl.getUniformLocation(shader.programID, 'viewMatrix'), false, views[i]);
+			gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, texture, 0);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 			gl.bindBuffer(gl.ARRAY_BUFFER, model.vertices);
-			gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
-		    gl.enableVertexAttribArray(0);
+			gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(0);
 			gl.drawArrays(gl.TRIANGLES, 0, model.vertexCount);
 			gl.disableVertexAttribArray(0);
-			gl.bindBuffer(gl.ARRAY_BUFFER,null);
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);
 		}
-		gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
 		return texture;
 	}
-	loadEnviromentMapHDR(textureUrl){
+	static loadEnviromentMapHDR(textureUrl) {
 		return new Promise(resolve => {
 			const textureID = gl.createTexture();
-			let eqMap = new EquitangularMap();
+			let envMap = new EnviromentMap(textureID);
 			let img = new HDRImage();
-			img.onload = function(){
-				gl.bindTexture(gl.TEXTURE_2D,textureID);
-				gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB16F,img.width,img.height,0,gl.RGB,gl.FLOAT,img.dataFloat);
+			img.onload = function () {
+				gl.bindTexture(gl.TEXTURE_2D, textureID);
+				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, img.width, img.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img.dataRGBE);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 				gl.bindTexture(gl.TEXTURE_2D, null);
-				eqMap.setEquitangularMap(textureID);
-				resolve(eqMap.textureID);
+
+				envMap.prepare().then(() => {
+					envMap.compute();
+					resolve(envMap.textureID);
+				});
 			};
 			img.src = textureUrl;
 		})
 	}
-	async loadEnviromentMapTGA(textureUrls){
-		const textureID = gl.createTexture();
-		let tga = new TGA();
-		gl.bindTexture(gl.TEXTURE_CUBE_MAP,textureID);
-		for(let i = 0;i < 6;i++){
-			await fetch(textureUrls[i]).then(async res => {
-				let data = new Uint8Array(await res.arrayBuffer());
-				tga.load(data);
-			});
-			let img = tga.getCanvas();
-			gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + i,0,gl.RGBA,img.width,img.height,0,gl.RGBA,gl.UNSIGNED_BYTE,img);
-		}
-		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
-		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-		gl.bindTexture(gl.TEXTURE_2D, null)
-		return textureID;
-	}
-	async loadObj(id,filename){
-		return await fetch(filename).then(res => {
-			const reader = res.body.getReader();
-			let file = "";
-
-			let vertices = new Array();
-			let textures = new Array();
-			let normals  = new Array();
-			let indices  = new Array();
-
-			return reader.read().then(function readChunk(buffer){
-				if(buffer.done)return file;
-				file += new TextDecoder('utf-8').decode(buffer.value);
-				return reader.read().then(readChunk);
-			})
-			.then(file => {
-				file = file.trim() + '\n';
-				const lines = file.split('\n');
-
-				lines.forEach(line => {
-					line = line.trim();
-					let values = line.split(' ');
-					let token = values.shift().trim();
-					switch(token){
-						case 'v':
-							vertices.push([parseFloat(values[0]),parseFloat(values[1]),parseFloat(values[2])]);
-							break;
-						case 'vt':
-							textures.push([parseFloat(values[0]), parseFloat(values[1])]);
-							break;
-						case 'vn':
-							normals.push([parseFloat(values[0]),parseFloat(values[1]),parseFloat(values[2])]);
-							break;
-						case 'f':
-							for(let i = 0;i < values.length;i++){
-								let vertexData = values[i].split('/');
-								indices.push({
-									vertex:parseInt(vertexData[0])-1,
-									texture:parseInt(vertexData[1])-1,
-									normal:parseInt(vertexData[2])-1,
-									hashCode:vertexData[0]+'/'+vertexData[1]+'/'+vertexData[2]
-								});
-							}
-							break;
-					}
-				})
-
-				let sortedVertices = new Array();
-				let sortedTextures = new Array();
-				let sortedNormals  = new Array();
-				let sortedIndices  = new Array();
-				let indexMap = new Array();
-
-				for(let i = 0;i < indices.length;i++){
-					let index = indices[i];
-					let currentVertex  = vertices[index.vertex];
-					let currentTexture = textures[index.texture];
-					let currentNormal  = normals[index.normal];
-
-					if(index.hashCode in indexMap){
-						sortedIndices.push(indexMap[index.hashCode]);
-					} else {
-						indexMap[index.hashCode] = sortedVertices.length/3;
-						sortedIndices.push(sortedVertices.length/3);
-
-						sortedVertices.push(currentVertex[0],currentVertex[1],currentVertex[2]);
-						sortedTextures.push(currentTexture[0],1-currentTexture[1]);
-						sortedNormals.push(currentNormal[0],currentNormal[1],currentNormal[2]);
-					}
-
-				}
-
-				return loader.createModel(id,sortedVertices,sortedIndices,sortedTextures,sortedNormals);
-			})
-			.catch(e => {console.error(e)});			
+	static loadEnviromentMapTGA(textureUrls) {
+		return new Promise(resolve => {
+			const textureID = gl.createTexture();
+			let tga = new TGA();
+			gl.bindTexture(gl.TEXTURE_CUBE_MAP, textureID);
+			for (let i = 0; i < 6; i++) {
+				fetch(textureUrls[i]).then(res => {
+					let data = new Uint8Array(res.arrayBuffer());
+					tga.load(data);
+					let img = tga.getCanvas();
+					gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, gl.RGBA, img.width, img.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
+				});
+			}
+			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			gl.bindTexture(gl.TEXTURE_2D, null)
 		});
 	}
 }
@@ -642,8 +641,20 @@ class Loader {
 		constructor(shaders){
 			this.shaders = shaders;
 			this.renderFBO = gl.createFramebuffer();
-
 			this.updateProjMatrix();
+			// this.fbo = gl.createFramebuffer();
+			// this.cbo = gl.createTexture();
+			// this.dbo = gl.createRenderbuffer();
+			// gl.bindRenderbuffer(gl.RENDERBUFFER,this.dbo);
+			// gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT24,canvas.width,canvas.height);
+			// gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+			// gl.bindTexture(gl.TEXTURE_2D, this.cbo);
+			// gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,canvas.width,canvas.height,0,gl.RGBA,gl.FLOAT,null);
+			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+			// gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			// gl.bindTexture(gl.TEXTURE_2D, null);
 		}
 		updateProjMatrix(){
 			this.FOV = 75.0 * (Math.PI / 180);
@@ -662,37 +673,38 @@ class Loader {
 			}
 		}
 		prepare(){
+			this.updateProjMatrix();
 			gl.enable(gl.CULL_FACE);
 			gl.enable(gl.DEPTH_TEST);
-			gl.clearColor(0.0, 0.0, 0.0, 1.0);
-		  	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 			gl.viewport(0,0,canvas.width,canvas.height);
-			this.updateProjMatrix();
+			gl.clearColor(0.0, 0.0, 0.0, 1.0);
 		}
 		renderScene(scene){
+			// gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+			// gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.cbo, 0);
+			// gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.dbo);
+			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 			this.currentScene = scene;
 			let viewMatrix = createViewMatrix(this.currentScene.camera);
-
 			this.shaders.staticShader.start();
 			this.shaders.staticShader.loadLights(this.currentScene.lights);
 			this.shaders.staticShader.loadViewMatrix(viewMatrix);
 			for(let entity of scene.entities){
 				this.renderEntity(entity);
 			}
-
 			this.shaders.terrainShader.start();
 			this.shaders.terrainShader.loadLights(this.currentScene.lights);
 			this.shaders.terrainShader.loadViewMatrix(viewMatrix);
 			for(let terrain of scene.terrains){
 				this.renderTerrain(terrain)
 			}
-
 			this.shaders.skyboxShader.start();
 			this.shaders.skyboxShader.loadViewMatrix(viewMatrix);
 			if(this.currentScene.skybox)
 				this.renderSkyBox(this.currentScene.skybox);
-
 			this.currentScene = null;
+			// gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+			// Renderer.renderTexturedQuad(this.cbo);
 		}
 		renderEntity(entity){
 			const model = entity.model;
@@ -780,13 +792,60 @@ class Loader {
 			gl.disableVertexAttribArray(0);
 			gl.bindBuffer(gl.ARRAY_BUFFER,null);
 
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null)
+			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+		}
+		static renderCube(size){
+			let model = new Cube(size);
+			gl.bindBuffer(gl.ARRAY_BUFFER, model.vertices);
+			gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(0);
+			gl.drawArrays(gl.TRIANGLES, 0, model.vertexCount);
+			gl.disableVertexAttribArray(0);
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		}
+		static renderTexturedQuad(texture){
+			let model = {
+				buffer: gl.createBuffer(),
+				vertices: [
+					-1, 1, -1, -1, 1, 1,
+					1, 1, -1, -1, 1, -1
+				],
+				vertexCount: 6
+			};
+			let shader = new StaticShader(
+				`#version 300 es
+				in vec2 position;
+				out vec2 textureCoords;
+				void main(){
+					textureCoords = (position + 1.0) / 2.0;
+					gl_Position = vec4(position,0.0,1.0);
+				}`,
+				`#version 300 es
+				precision mediump float;
+				in vec2 textureCoords;
+				out vec4 out_Color;
+				uniform sampler2D image;
+				void main(){
+					out_Color = texture(image, textureCoords);
+				}`
+			);
+			shader.bindAttribute(0,'position');
+			shader.start();
+			gl.activeTexture(gl.TEXTURE0);
+			gl.bindTexture(gl.TEXTURE_2D, texture);
+			gl.bindBuffer(gl.ARRAY_BUFFER, model.buffer);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(model.vertices), gl.STATIC_DRAW);
+			gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(0);
+			gl.drawArrays(gl.TRIANGLES, 0, model.vertexCount);
+			gl.disableVertexAttribArray(0);
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);
 		}
 	}
 	class VRRenderer extends Renderer{
 		constructor(shaders){
 			super(shaders);
-			this.crosshairTexture = loader.createTextureFromColor(new Vector3f(1));
+			this.crosshairTexture = Loader.createTextureFromColor(new Vector3f(1));
 			this.crosshairShader = new ShaderProgram(
 					`#version 300 es
 					in vec2 position;
@@ -821,20 +880,19 @@ class Loader {
 			// gl.enable(gl.BLEND);
 			// gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-			gl.useProgram(this.crosshairShader.programID);
-			gl.bindAttribLocation(this.crosshairShader.programID, 0, 'position');
-			gl.activeTexture(gl.TEXTURE0);
-			gl.bindTexture(gl.TEXTURE_2D, this.crosshairTexture);
+			// gl.useProgram(this.crosshairShader.programID);
+			// gl.bindAttribLocation(this.crosshairShader.programID, 0, 'position');
+			// gl.activeTexture(gl.TEXTURE0);
+			// gl.bindTexture(gl.TEXTURE_2D, this.crosshairTexture);
 
-			gl.bindBuffer(gl.ARRAY_BUFFER, this.positions);
-			gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+			// gl.bindBuffer(gl.ARRAY_BUFFER, this.positions);
+			// gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
 		    
-		    gl.enableVertexAttribArray(0);
-			gl.drawArrays(gl.TRIANGLES_STRIP, 0, 4);
-			gl.disableVertexAttribArray(0);
+		    // gl.enableVertexAttribArray(0);
+			// gl.drawArrays(gl.TRIANGLES_STRIP, 0, 4);
+			// gl.disableVertexAttribArray(0);
 
 			// gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
 			// gl.disable(gl.BLEND);
 		}
 		renderScene(scene,frameData){
@@ -943,13 +1001,12 @@ class Loader {
 			this.enviromentMap = textureID;
 		}
 	}
-	class EquitangularMap{
-		constructor(){
-			this.res = 4096;
-			this.model = new Cube(1);
+	class EnviromentMap{
+		constructor(eqMap){
+			this.res = 1024;
 			this.fbo = gl.createFramebuffer();
-			this.rbo = gl.createRenderbuffer();
-			this.textureID = loader.createEmptyEnviromentMap(this.res);
+			this.equitangularMap = eqMap || null;
+			this.textureID = Loader.createEmptyEnviromentMap(this.res);
 			this.views = [
 				mat4.lookAt(mat4.create(),[0,0,0],[ 1, 0, 0],[0,-1, 0]),
 				mat4.lookAt(mat4.create(),[0,0,0],[-1, 0, 0],[0,-1, 0]),
@@ -957,52 +1014,53 @@ class Loader {
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0,-1, 0],[0, 0,-1]),
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0, 1],[0,-1, 0]),
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0,-1],[0,-1, 0])
-			]
-			gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-			gl.bindRenderbuffer(gl.RENDERBUFFER, this.rbo);
-			gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, this.res, this.res);
-			gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.rbo);			
-			gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+			];
 		}
-		async setEquitangularMap(texture){
-			this.enviromentMap = texture;
-			let data = await fetchShader("shaders/pbr-precompute/cubemap.vert","shaders/pbr-precompute/enviroment/enviroment.frag");
-			this.shader = new PBRPrecomputeShader(data.vertexSource,data.fragmentSource);
-			this.calculate();
+		setEquitangularMap(texture) {
+			this.equitangularMap = texture;
+			this.prepare().then(() => this.compute);
 		}
-		calculate(){
+		prepare(){
+			return new Promise(resolve => {
+				if(!this.shader)
+					fetchShader(
+						"shaders/pbr-precompute/cubemap.vert",
+						"shaders/pbr-precompute/enviroment/enviroment.frag"
+					).then(data => {
+						this.shader = new PBRPrecomputeShader(data.vertexSource, data.fragmentSource);
+						resolve();
+					});
+				else resolve();
+			});
+		}
+		compute(){
 			let projectionMatrix = mat4.perspective(mat4.create(),Math.PI/2,1,0.1,10);
 			this.shader.start();
 			this.shader.loadProjectionMatrix(projectionMatrix);
-			gl.activeTexture(gl.TEXTURE0);
-			gl.bindTexture(gl.TEXTURE_2D,this.enviromentMap);
-			gl.viewport(0,0,this.res,this.res);
 			gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+			gl.viewport(0,0,this.res,this.res);
+			gl.activeTexture(gl.TEXTURE0);
+			gl.bindTexture(gl.TEXTURE_2D, this.equitangularMap);
 			for(let i = 0;i < 6;i++){
 				this.shader.loadViewMatrix(this.views[i]);
 				gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,this.textureID,0);
 				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-				gl.bindBuffer(gl.ARRAY_BUFFER, this.model.vertices);
-				gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
-			 	gl.enableVertexAttribArray(0);
-				gl.drawArrays(gl.TRIANGLES, 0, this.model.vertexCount);
-				gl.disableVertexAttribArray(0);
-				gl.bindBuffer(gl.ARRAY_BUFFER,null);
+				Renderer.renderCube(1);
 			}
+			gl.bindTexture(gl.TEXTURE_2D, null);
 			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 			gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.textureID);
+			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
 			gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
 			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 		}
 	}
 	class IrradianceMap {
-		constructor(){
-			this.res = 32;
-			this.model = new Cube(1);
+		constructor(enviromentMap){
+			this.res = 64;
 			this.fbo = gl.createFramebuffer();
-			this.rbo = gl.createRenderbuffer();
-			this.textureID = loader.createEmptyEnviromentMap(this.res);
+			this.enviromentMap = enviromentMap || null;
+			this.textureID = Loader.createEmptyEnviromentMap(this.res);
 			this.views = [
 				mat4.lookAt(mat4.create(),[0,0,0],[ 1, 0, 0],[0,-1, 0]),
 				mat4.lookAt(mat4.create(),[0,0,0],[-1, 0, 0],[0,-1, 0]),
@@ -1010,56 +1068,51 @@ class Loader {
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0,-1, 0],[0, 0,-1]),
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0, 1],[0,-1, 0]),
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0,-1],[0,-1, 0])
-			]
-			
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.textureID);
-			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
-
-			gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-			gl.bindRenderbuffer(gl.RENDERBUFFER, this.rbo);
-			gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, this.res, this.res);
-			gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.rbo);
-			gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+			];
 		}
-		async setEnviromentMap(texture){
+		setEnviromentMap(texture) {
 			this.enviromentMap = texture;
-			let data = await fetchShader("shaders/pbr-precompute/cubemap.vert","shaders/pbr-precompute/irradiance/irradiance.frag");
-			this.shader = new PBRPrecomputeShader(data.vertexSource,data.fragmentSource);
-			this.calculate();
+			this.prepare().then(() => this.compute);
 		}
-		calculate(){
-			let projectionMatrix = mat4.perspective(mat4.create(),Math.PI/2,1,0.1,10);
-			this.shader.start();
-			this.shader.loadProjectionMatrix(projectionMatrix);
-			gl.activeTexture(gl.TEXTURE0);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP,this.enviromentMap);
-			gl.viewport(0,0,this.res,this.res);
-			gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-			for(let i = 0;i < 6;i++){
-				this.shader.loadViewMatrix(this.views[i]);
-				gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,this.textureID,0);
-				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-				gl.bindBuffer(gl.ARRAY_BUFFER, this.model.vertices);
-				gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
-			    gl.enableVertexAttribArray(0);
-				gl.drawArrays(gl.TRIANGLES, 0, this.model.vertexCount);
-				gl.disableVertexAttribArray(0);
-				gl.bindBuffer(gl.ARRAY_BUFFER,null);
+		prepare(){
+			return new Promise(resolve => {
+				if (!this.shader)
+					fetchShader(
+						"shaders/pbr-precompute/cubemap.vert",
+						"shaders/pbr-precompute/irradiance/irradiance.frag"
+					).then(data => {
+						this.shader = new PBRPrecomputeShader(data.vertexSource, data.fragmentSource);
+						resolve();
+					});
+				else resolve();
+			});
+		}
+		compute(){
+			if(this.enviromentMap){
+				let projectionMatrix = mat4.perspective(mat4.create(),Math.PI/2,1,0.1,10);
+				this.shader.start();
+				this.shader.loadProjectionMatrix(projectionMatrix);
+				gl.activeTexture(gl.TEXTURE0);
+				gl.bindTexture(gl.TEXTURE_CUBE_MAP,this.enviromentMap);
+				gl.viewport(0,0,this.res,this.res);
+				gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+				for(let i = 0;i < 6;i++){
+					this.shader.loadViewMatrix(this.views[i]);
+					gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,this.textureID,0);
+					gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+					Renderer.renderCube(1);
+				}
+				gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 			}
-			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 		}
 	}
 	class PrefilteredMap {
-		constructor(){
-			this.res = 512;
-			this.model = new Cube(1);
+		constructor(enviromentMap) {
+			this.res = 1024;
 			this.fbo = gl.createFramebuffer();
-			this.rbo = gl.createRenderbuffer();
-			this.textureID = loader.createEmptyEnviromentMap(this.res);
-			this.mipLevels = 10;
+			this.enviromentMap = enviromentMap || null;
+			this.textureID = Loader.createEmptyEnviromentMap(this.res);
+			this.mipLevels = 5;
 			this.views = [
 				mat4.lookAt(mat4.create(),[0,0,0],[ 1, 0, 0],[0,-1, 0]),
 				mat4.lookAt(mat4.create(),[0,0,0],[-1, 0, 0],[0,-1, 0]),
@@ -1067,47 +1120,52 @@ class Loader {
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0,-1, 0],[0, 0,-1]),
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0, 1],[0,-1, 0]),
 				mat4.lookAt(mat4.create(),[0,0,0],[ 0, 0,-1],[0,-1, 0])
-			]
+			];
 			gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.textureID);
+			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
 			gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
 			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 		}
-		async setEnviromentMap(texture){
+		setEnviromentMap(texture) {
 			this.enviromentMap = texture;
-			let data = await fetchShader("shaders/pbr-precompute/cubemap.vert","shaders/pbr-precompute/prefilter/prefilter.frag");
-			this.shader = new PBRPrecomputeShader(data.vertexSource,data.fragmentSource);
-			this.calculate();
+			this.prepare().then(() => this.compute);
 		}
-		calculate(){
-			let projectionMatrix = mat4.perspective(mat4.create(),Math.PI/2,1.0,0.1,10.0);
-			this.shader.start();
-			this.shader.loadProjectionMatrix(projectionMatrix);
-			gl.activeTexture(gl.TEXTURE0);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.enviromentMap);
-			gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-			for(let mip = 0; mip < this.mipLevels; mip++){
-				let size = this.res * Math.pow(0.5,mip);
-				let roughness = mip / (this.mipLevels-1);
-				this.shader.loadFloat(gl.getUniformLocation(this.shader.programID, 'roughness'),roughness);
-				gl.bindRenderbuffer(gl.RENDERBUFFER, this.rbo);
-				gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, size, size);
-				gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-				gl.viewport(0,0,size,size);
-				for(let i = 0;i < 6;i++){
-					this.shader.loadViewMatrix(this.views[i]);
-					gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,this.textureID,mip);
-					gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-					
-					gl.bindBuffer(gl.ARRAY_BUFFER, this.model.vertices);
-					gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
-				    gl.enableVertexAttribArray(0);
-					gl.drawArrays(gl.TRIANGLES, 0, this.model.vertexCount);
-					gl.disableVertexAttribArray(0);
-					gl.bindBuffer(gl.ARRAY_BUFFER,null);
+		prepare() {
+			return new Promise(resolve => {
+				if (!this.shader)
+					fetchShader(
+						"shaders/pbr-precompute/cubemap.vert",
+						"shaders/pbr-precompute/prefilter/prefilter.frag"
+					).then(data => {
+						this.shader = new PBRPrecomputeShader(data.vertexSource, data.fragmentSource);
+						resolve();
+					});
+				else resolve();
+			});
+		}
+		compute(){
+			if(this.enviromentMap){
+				let projectionMatrix = mat4.perspective(mat4.create(),Math.PI/2,1.0,0.1,10.0);
+				this.shader.start();
+				this.shader.loadProjectionMatrix(projectionMatrix);
+				gl.activeTexture(gl.TEXTURE0);
+				gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.enviromentMap);
+				gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+				for(let mip = 0; mip < this.mipLevels; mip++){
+					let size = this.res * Math.pow(0.5,mip);
+					let roughness = mip / (this.mipLevels-1);
+					this.shader.loadFloat(gl.getUniformLocation(this.shader.programID, 'roughness'),roughness);
+					gl.viewport(0,0,size,size);
+					for(let i = 0;i < 6;i++){
+						this.shader.loadViewMatrix(this.views[i]);
+						gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,this.textureID,mip);
+						gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+						Renderer.renderCube(1);
+					}
 				}
+				gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+				gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 			}
-			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
 		}
 	}
 	class Terrain{
@@ -1165,34 +1223,34 @@ class Loader {
 // Entities
 	class Material {
 		constructor(diffuseMap,normalMap,metalnessMap,roughnessMap,occlusionMap){			
-			this.diffuseMap   = diffuseMap   || loader.createTextureFromColor(new Vector3f(0.8,0.8,0.8));
-			this.normalMap    = normalMap    || loader.createTextureFromColor(new Vector3f(0.5,0.5,1.0));
-			this.metalnessMap = metalnessMap || loader.createTextureFromColor(new Vector3f(0.0,0.0,0.0));
-			this.roughnessMap = roughnessMap || loader.createTextureFromColor(new Vector3f(0.5,0.0,0.0));
-			this.occlusionMap = occlusionMap || loader.createTextureFromColor(new Vector3f(1.0,1.0,1.0));
+			this.diffuseMap   = diffuseMap   || Loader.createTextureFromColor(new Vector3f(0.8, 0.8, 0.8));
+			this.normalMap    = normalMap    || Loader.createTextureFromColor(new Vector3f(0.5, 0.5, 1.0));
+			this.metalnessMap = metalnessMap || Loader.createTextureFromColor(new Vector3f(0.0, 0.0, 0.0));
+			this.roughnessMap = roughnessMap || Loader.createTextureFromColor(new Vector3f(0.0, 0.0, 0.0));
+			this.occlusionMap = occlusionMap || Loader.createTextureFromColor(new Vector3f(1.0, 1.0, 1.0));
 			this.irradianceMap = new IrradianceMap();
 			this.prefilteredMap = new PrefilteredMap();
 		}
 		setIrradianceMap(texture){
-			this.irradianceMap = texture;
+			if (texture) this.irradianceMap = texture;
 		}
 		setPrefilteredMap(texture){
-			this.prefilteredMap = texture;	
+			if (texture) this.prefilteredMap = texture;
 		}
 		setDiffuseMap(texture){
-			this.diffuseMap = texture;
+			if (texture) this.diffuseMap = texture;
 		}
 		setNormalMap(texture){
-			this.normalMap = texture;
+			if (texture) this.normalMap = texture;
 		}
 		setMetalnessMap(texture){
-			this.metalnessMap = texture;
+			if (texture) this.metalnessMap = texture;
 		}
 		setRoughnessMap(texture){
-			this.roughnessMap = texture;
+			if (texture) this.roughnessMap = texture;
 		}
 		setOcclusionMap(texture){
-			this.occlusionMap = texture;
+			if (texture) this.occlusionMap = texture;
 		}
 	}
 	class Model {

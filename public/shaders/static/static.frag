@@ -183,11 +183,10 @@ void main(void) {
 	//-- Debug --//
 		// out_Color = vec4(vec3(G(N, V, V, (roughness*roughness)/2.0)),1.0);
 
-
-		// out_Color = textureLod(pbr.enviroment,N,0.0);
-		out_Color = vec4(gammaCorrection(irradiance), 1.0);
-		// out_Color = vec4(prefiltered,1.0);
-		// out_Color = vec4(specular, 1.0);
+		// out_Color = vec4(gammaCorrection(texture(pbr.enviroment,N).rgb),1.0);
+		// out_Color = vec4(gammaCorrection(irradiance),1.0);
+		// out_Color = vec4(gammaCorrection(prefiltered),1.0);
+		// out_Color = vec4(specular,1.0);
 		// out_Color = vec4(diffuse,1.0);
 		// out_Color = vec4(L0,1.0);
 
