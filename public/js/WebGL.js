@@ -194,20 +194,30 @@ class Loader {
 	}
 	async loadObj(id, filename) {
 		return await fetch(filename).then(res => {
+			const td = new TextDecoder('utf-8');
 			const reader = res.body.getReader();
 			let file = "";
-			let vertices = new Array();
-			let textures = new Array();
-			let normals = new Array();
-			let indices = new Array();
-			return reader.read().then(function readChunk(buffer) {
+			return reader.read()
+				.then(function readChunk(buffer) {
 					if (buffer.done) return file;
-					file += new TextDecoder('utf-8').decode(buffer.value);
+					file += td.decode(buffer.value);
 					return reader.read().then(readChunk);
 				})
 				.then(file => {
 					file = file.trim() + '\n';
 					const lines = file.split('\n');
+					
+					let vertices = new Array();
+					let textures = new Array();
+					let normals = new Array();
+					let indices = new Array();
+					
+					let sortedVertices = new Array();
+					let sortedTextures = new Array();
+					let sortedNormals = new Array();
+					let sortedIndices = new Array();
+					let indexMap = new Array();
+
 					lines.forEach(line => {
 						line = line.trim();
 						let values = line.split(' ');
@@ -234,12 +244,8 @@ class Loader {
 								}
 								break;
 						}
-					})
-					let sortedVertices = new Array();
-					let sortedTextures = new Array();
-					let sortedNormals = new Array();
-					let sortedIndices = new Array();
-					let indexMap = new Array();
+					});
+
 					for (let i = 0; i < indices.length; i++) {
 						let index = indices[i];
 						let currentVertex = vertices[index.vertex];
@@ -253,10 +259,13 @@ class Loader {
 							sortedIndices.push(sortedVertices.length / 3);
 
 							sortedVertices.push(currentVertex[0], currentVertex[1], currentVertex[2]);
-							sortedTextures.push(currentTexture[0], 1 - currentTexture[1]);
-							sortedNormals.push(currentNormal[0], currentNormal[1], currentNormal[2]);
+							if(currentTexture)
+								sortedTextures.push(currentTexture[0], 1 - currentTexture[1]);
+							if(currentNormal)
+								sortedNormals.push(currentNormal[0], currentNormal[1], currentNormal[2]);
 						}
 					}
+
 					return this.createModel(id, sortedVertices, sortedIndices, sortedTextures, sortedNormals);
 				})
 				.catch(e => {
@@ -1223,7 +1232,7 @@ class Loader {
 			this.diffuseMap   = diffuseMap   || Loader.createTextureFromColor(new Vector3f(0.8, 0.8, 0.8));
 			this.normalMap    = normalMap    || Loader.createTextureFromColor(new Vector3f(0.5, 0.5, 1.0));
 			this.metalnessMap = metalnessMap || Loader.createTextureFromColor(new Vector3f(0.0, 0.0, 0.0));
-			this.roughnessMap = roughnessMap || Loader.createTextureFromColor(new Vector3f(0.0, 0.0, 0.0));
+			this.roughnessMap = roughnessMap || Loader.createTextureFromColor(new Vector3f(0.25,0.0, 0.0));
 			this.occlusionMap = occlusionMap || Loader.createTextureFromColor(new Vector3f(1.0, 1.0, 1.0));
 			this.irradianceMap = new IrradianceMap();
 			this.prefilteredMap = new PrefilteredMap();

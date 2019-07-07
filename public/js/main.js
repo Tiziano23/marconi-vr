@@ -216,15 +216,15 @@ async function preload(){
 	});
 
 	notifier.notify('Loading models');
-	models.sphere      = await loader.loadObj('sphere', 'res/models/sphere.obj');
-	models.blackboard  = await loader.loadObj('blackboard','res/models/blackboard.obj');
-	models.teacherDesk = await loader.loadObj('teacherDesk','res/models/teacherDesk.obj');
-	models.floor       = await loader.loadObj('floor','res/models/floor.obj');
 	models.desk        = await loader.loadObj('desk','res/models/desk.obj');
 	models.chair       = await loader.loadObj('chair','res/models/chair.obj');
+	models.floor       = await loader.loadObj('floor','res/models/floor.obj');
 	models.sheet       = await loader.loadObj('sheet','res/models/sheet.obj');
-	models.cube        = await loader.loadObj('cube', 'res/models/cube.obj');
-	models.gun        = await loader.loadObj('gun', 'res/models/gun.obj');
+	models.blackboard  = await loader.loadObj('blackboard','res/models/blackboard.obj');
+	models.teacherDesk = await loader.loadObj('teacherDesk','res/models/teacherDesk.obj');
+
+	models.cube        = await loader.loadObj('cube','res/models/cube.obj');
+	models.sphere      = await loader.loadObj('sphere','res/models/sphere.obj');
 
 	notifier.notify('Loading textures');
 	for(let id in models){
@@ -243,12 +243,11 @@ async function preload(){
 	models.floor.textures['normal'] = await Loader.loadTexture('res/textures/floor/tiles/bump.png');
 	models.floor.textures['albedo'] = await Loader.loadTexture('res/textures/floor/tiles/albedo.png');
 	models.floor.textures['roughness'] = await Loader.loadTexture('res/textures/floor/tiles/roughness.png');
-	// models.floor.textures['occlusion'] = await Loader.loadTexture('res/textures/floor/grass/ao.png');
+	models.floor.textures['occlusion'] = await Loader.loadTexture('res/textures/floor/grass/ao.png');
 
 	notifier.notify('Loading enviroment');
 	// window.enviromentMap = await Loader.loadEnviromentMapHDR('res/skybox/indoor/2k.hdr');
 	window.enviromentMap = Loader.createEnviromentMap(64,new Vector3f(0.6,0.8,1.0),new Vector3f(1,1,1));
-
 	window.precomputedIrradianceMap = new IrradianceMap(window.enviromentMap);
 	window.precomputedPrefilteredMap = new PrefilteredMap(window.enviromentMap);
 	await window.precomputedIrradianceMap.prepare();
@@ -283,15 +282,15 @@ function main(){
 	});
 
 	// Entities
-		const entity = new Entity(models.chair, new Vector3f(0,0,-5), new Vector3f(), 1);
-		scene.addEntity(entity);
+		// const entity = new Entity(models.vase, new Vector3f(0,0,-5), new Vector3f(), 0.8);
+		// scene.addEntity(entity);
 
-		const floor = new Entity(models.floor,new Vector3f(0,0,0),new Vector3f(),1);
+		// const floor = new Entity(models.floor,new Vector3f(0,0,0),new Vector3f(),1);
 		// floor.model.material.setNormalMap(models.floor.textures['normal']);
 		// floor.model.material.setDiffuseMap(models.floor.textures['albedo']);
 		// floor.model.material.setRoughnessMap(models.floor.textures['roughness']);
 		// floor.model.material.setOcclusionMap(models.floor.textures['occlusion']);
-		scene.addEntity(floor);
+		// scene.addEntity(floor);
 	
 		// const blackboard = new Entity(models.blackboard,new Vector3f(0,6.5,-49.5),new Vector3f(),1);
 		// blackboard.model.material.setDiffuseMap(models.blackboard.textures['albedo']);
