@@ -10,11 +10,9 @@
 	
 	<title>Marconi VR</title>
 
-	<script src="js/lib/tga.js"></script>
-	<script src="js/lib/lib.js"></script>
-	<script src="js/lib/hdrpng.min.js"></script>
 	<script src="js/lib/gl-matrix.js"></script>
-	<script src="js/socket/socket.io.js"></script>
+	<script src="js/lib/socket.io.js"></script>
+	<script src="js/lib/hdrpng.min.js"></script>
 </head>
 <body>
 	<div id="loader">
@@ -45,6 +43,7 @@
 	<button onclick="WebVRToggle()" class="floating-btn" id="enable-vr"><i class="fas fa-vr-cardboard"></i></button>
 	<button onclick="streamer.toggleFrame()" class="floating-btn" id="open-streamer"><i class="fas fa-gamepad"></i></button>
 	<canvas id="display"></canvas>
+	
 	<script src="js/notifier.js"></script>
 	<script src="js/gui.js"></script>
 	<script src="js/WebGL.js"></script>
