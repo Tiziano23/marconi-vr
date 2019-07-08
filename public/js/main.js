@@ -1,14 +1,13 @@
 "use strict";
 const canvas = document.querySelector('#display');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;
 const gl = canvas.getContext("webgl2");
 if (!gl) throw 'Error - Unable to initialize WebGL. Your browser or your PC may not support it.';
 gl.getExtension('EXT_color_buffer_float');
-gl.enable(gl.DEPTH_TEST);
-gl.enable(gl.CULL_FACE);
 gl.depthFunc(gl.LEQUAL);
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;
 
 const keyboard = {
 	keys:{},
@@ -187,10 +186,11 @@ const input = {
 	}
 };
 
-let shaders = {};
-let models = {};
+const shaders = {};
 const loader = new Loader();
 const socket = io(window.location.href);
+
+let sceneData;
 
 function contentLoaded(){
 	canvas.classList.remove('loading');
@@ -199,7 +199,6 @@ function contentLoaded(){
 	document.querySelector('#loader .background').style.opacity = 1;
 	document.querySelector('#loader .background').style.animation = 'fade-out 2.5s both cubic-bezier(0.25,0.75,0.25,1.0)';
 }
-
 preload();
 async function preload(){
 	canvas.classList.add('loading');
@@ -211,43 +210,13 @@ async function preload(){
 	await fetchShader("shaders/skybox/skybox.vert","shaders/skybox/skybox.frag").then(data => {
 		shaders.skyboxShader = new SkyboxShader(data.vertexSource,data.fragmentSource);
 	});
-	await fetchShader("shaders/terrain/terrain.vert","shaders/terrain/terrain.frag").then(data => {
-		shaders.terrainShader = new TerrainShader(data.vertexSource,data.fragmentSource);
-	});
 
-	notifier.notify('Loading models');
-	models.desk        = await loader.loadObj('desk','res/models/desk.obj');
-	models.chair       = await loader.loadObj('chair','res/models/chair.obj');
-	models.floor       = await loader.loadObj('floor','res/models/floor.obj');
-	models.sheet       = await loader.loadObj('sheet','res/models/sheet.obj');
-	models.blackboard  = await loader.loadObj('blackboard','res/models/blackboard.obj');
-	models.teacherDesk = await loader.loadObj('teacherDesk','res/models/teacherDesk.obj');
-
-	models.cube        = await loader.loadObj('cube','res/models/cube.obj');
-	models.sphere      = await loader.loadObj('sphere','res/models/sphere.obj');
-
-	notifier.notify('Loading textures');
-	for(let id in models){
-		models[id].textures = {};
-		try {
-			models[id].textures['albedo']    = await Loader.loadTexture('res/textures/'+id+'/albedo.png');
-			models[id].textures['roughness'] = await Loader.loadTexture('res/textures/'+id+'/roughness.png');
-			models[id].textures['normal']    = await Loader.loadTexture('res/textures/'+id+'/bump.png');
-			models[id].textures['metalness'] = await Loader.loadTexture('res/textures/'+id+'/metalness.png');
-		} catch (e) {
-			console.warn(e.msg);
-			continue;
-		}
-	}
-	models.sheet.textures['albedo'] = await Loader.loadTexture('res/textures/notes.png');
-	models.floor.textures['normal'] = await Loader.loadTexture('res/textures/floor/tiles/bump.png');
-	models.floor.textures['albedo'] = await Loader.loadTexture('res/textures/floor/tiles/albedo.png');
-	models.floor.textures['roughness'] = await Loader.loadTexture('res/textures/floor/tiles/roughness.png');
-	models.floor.textures['occlusion'] = await Loader.loadTexture('res/textures/floor/grass/ao.png');
+	notifier.notify('Loading scene');
+	sceneData = await new GLTFLoader().load("res/models/scene.gltf");
 
 	notifier.notify('Loading enviroment');
-	// window.enviromentMap = await Loader.loadEnviromentMapHDR('res/skybox/indoor/2k.hdr');
-	window.enviromentMap = Loader.createEnviromentMap(64,new Vector3f(0.6,0.8,1.0),new Vector3f(1,1,1));
+	window.enviromentMap = await Loader.loadEnviromentMapHDR('res/skybox/indoor/2k.hdr');
+	// window.enviromentMap = Loader.createEnviromentMap(64,new Vector3f(0.6,0.8,1.0),new Vector3f(1,1,1));
 	window.precomputedIrradianceMap = new IrradianceMap(window.enviromentMap);
 	window.precomputedPrefilteredMap = new PrefilteredMap(window.enviromentMap);
 	await window.precomputedIrradianceMap.prepare();
@@ -258,22 +227,21 @@ async function preload(){
 	setTimeout(contentLoaded, 1250);
 	main();
 }
-
 function main(){
 	display.init();
 	window.renderer   = new Renderer(shaders);
 	window.vrRenderer = new VRRenderer(shaders);
 	
 	window.scene  = new Scene();
-	window.player = new Player();
+	window.player = new Player(new Vector3f(0,0,5));
 	window.camera = new Camera();
 	camera.setViewAnchor(player);
 
 	const skybox = new Skybox(window.enviromentMap);
 
-	for (let id in models) {
-		models[id].material.setIrradianceMap(precomputedIrradianceMap);
-		models[id].material.setPrefilteredMap(precomputedPrefilteredMap);
+	for (let node of sceneData.nodes) {
+		node.mesh.setIrradianceMap(precomputedIrradianceMap);
+		node.mesh.setPrefilteredMap(precomputedPrefilteredMap);
 	}
 
 	scene.on('skyboxUpdated',() => {
@@ -282,8 +250,8 @@ function main(){
 	});
 
 	// Entities
-		// const entity = new Entity(models.vase, new Vector3f(0,0,-5), new Vector3f(), 0.8);
-		// scene.addEntity(entity);
+		for (let node of sceneData.nodes)
+			scene.addEntity(node);
 
 		// const floor = new Entity(models.floor,new Vector3f(0,0,0),new Vector3f(),1);
 		// floor.model.material.setNormalMap(models.floor.textures['normal']);
@@ -338,7 +306,6 @@ function main(){
 
 	draw();
 }
-
 function draw(options){
 	options = options || {};
 	display.update();

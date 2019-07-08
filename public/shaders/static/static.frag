@@ -5,6 +5,7 @@ const float PI = 3.14159265359;
 
 struct Light {
 	vec3 color;
+	vec3 relativePos;
 	float brightness;
 };
 struct Material {
@@ -21,17 +22,15 @@ struct PBRData {
 	samplerCube prefiltered;
 };
 
-in vec2 pass_texture;
-in vec3 pass_position;
-in vec3 surfaceNormal;
-in vec3 toCameraVector;
-in vec3 toLightVecs[20];
+in vec3 V;
+in mat3 TBN;
+in vec2 textureCoords;
 
 out vec4 out_Color;
 
-uniform Material material;
-uniform Light lights[20];
 uniform PBRData pbr;
+uniform Light lights[20];
+uniform Material material;
 
 //-- BRDF --//
 	float D(vec3 n, vec3 h, float a){	
@@ -53,6 +52,7 @@ uniform PBRData pbr;
 	vec3 fresnelRoughness(vec3 h,vec3 v, vec3 F0, float roughness){
 		return F0 + ((max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - max(dot(h,v),0.0),5.0));
 	}
+//----------//
 
 //-- Functions --//
 	vec3 HDRToneMapping(vec3 color){
@@ -61,20 +61,7 @@ uniform PBRData pbr;
 	vec3 gammaCorrection(vec3 color){
 		return pow(color,vec3(1.0/2.2));
 	}
-	vec3 normalFromTexture() {
-		vec3 normalMap = texture(material.normalMap,pass_texture).xyz * 2.0 - 1.0;
-		vec3 Q1 = dFdx(pass_position);
-		vec3 Q2 = dFdy(pass_position);
-		vec2 st1 = dFdx(pass_texture);
-		vec2 st2 = dFdy(pass_texture);
-
-		vec3 N = normalize(surfaceNormal);
-		vec3 T = normalize(Q1 * st2.t - Q2 * st1.t);
-		vec3 B = -normalize(cross(N, T));
-		mat3 TBN = mat3(T, B, N);
-
-		return normalize(TBN * normalMap);
-	}
+//---------------//
 
 //-- Low Discrepancy sequence --//
 	float RadicalInverse_VdC(uint bits) {
@@ -88,6 +75,7 @@ uniform PBRData pbr;
 	vec2 Hammersley(uint i, uint N){
 		return vec2(float(i)/float(N), RadicalInverse_VdC(i));
 	}
+//------------------------------//
 
 //-- Importance Sampling --//
 	vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness){
@@ -106,16 +94,18 @@ uniform PBRData pbr;
 
 	    return normalize(sampleVec);
 	}
-void main(void) {
-	vec3  albedo    = pow(texture(material.diffuseMap,pass_texture).rgb,vec3(2.2));
-	float metalness = texture(material.metalnessMap,pass_texture).r;
-	float roughness = texture(material.roughnessMap,pass_texture).r;
-	float ao        = texture(material.occlusionMap,pass_texture).r;
+//-------------------------//
 
-	vec3 N = /*surfaceNormal;//*/normalFromTexture();
-	vec3 V = normalize(toCameraVector);
+void main(void) {
+	vec3  albedo    = pow(texture(material.diffuseMap,textureCoords).rgb,vec3(2.2));
+	vec3  normalMap = texture(material.normalMap,textureCoords).rgb * 2.0 - 1.0;
+	float metalness = texture(material.metalnessMap,textureCoords).r;
+	float roughness = texture(material.roughnessMap,textureCoords).r;
+	float ao        = texture(material.occlusionMap,textureCoords).r;
+
+	vec3 N = inverse(TBN) * normalMap;
+	vec3 V = normalize(V);
 	vec3 R = reflect(-V,N);
-	float NdotV = max(dot(N,V),0.0);
 
 	float ior = 1.45;
 	vec3 F0 = vec3(pow(abs((1.0 - ior) / (1.0 + ior)),2.0));
@@ -139,30 +129,32 @@ void main(void) {
 		// 	}
 		// }
 		// BRDF /= float(SAMPLE_COUNT);
+	//----------//
 	
 	//-- Scene Lighting --//
-		vec3 L0 = vec3(0.0);
-		for(int i = 0;i < 20;i++){
-			if(lights[i].brightness > 0.0){
-				vec3 L = normalize(toLightVecs[i]);
-				vec3 H = normalize(V + L);
-				float NdotL = max(dot(N,L),0.0);
-				if(NdotL > 0.0){
-					float dist = length(toLightVecs[i]);
-					float attenuation = 1.0 / (0.5 + 0.1*dist*dist);
-					vec3 radiance = lights[i].color * lights[i].brightness * attenuation;
-					float D = D(N,H,roughness);
-					float G = G(N,V,L,roughness);
-					vec3  F = F(H,V,F0);
-					vec3 kS = F;
-					vec3 kD = 1.0 - kS;
-					kD *= 1.0 - metalness;
-					vec3 fr = (kD * albedo / PI) + ((D*G) / (4.0 * NdotV * NdotL + 0.001));
-					L0 += fr * radiance * NdotL;
-				}
-			}
-		}
-	
+		// vec3 L0 = vec3(0.0);
+		// for(int i = 0;i < 20;i++){
+		// 	if(lights[i].brightness > 0.0){
+		// 		vec3 L = normalize(toLightVecs[i]);
+		// 		vec3 H = normalize(V + L);
+		// 		float NdotL = max(dot(N,L),0.0);
+		// 		if(NdotL > 0.0){
+		// 			float dist = length(toLightVecs[i]);
+		// 			float attenuation = 1.0 / (0.5 + 0.1*dist*dist);
+		// 			vec3 radiance = lights[i].color * lights[i].brightness * attenuation;
+		// 			float D = D(N,H,roughness);
+		// 			float G = G(N,V,L,roughness);
+		// 			vec3  F = F(H,V,F0);
+		// 			vec3 kS = F;
+		// 			vec3 kD = 1.0 - kS;
+		// 			kD *= 1.0 - metalness;
+		// 			vec3 fr = (kD * albedo / PI) + ((D*G) / (4.0 * NdotV * NdotL + 0.001));
+		// 			L0 += fr * radiance * NdotL;
+		// 		}
+		// 	}
+		// }
+	//--------------------//
+
 	vec3 kS = fresnelRoughness(N,V,F0,roughness);
 	vec3 kD = 1.0 - kS;
 	kD *= 1.0 - metalness;
@@ -173,7 +165,7 @@ void main(void) {
 
 	vec3 diffuse = kD * albedo * irradiance;
 	vec3 specular = kS * prefiltered;
-	vec3 color = (diffuse + specular + L0) * ao;
+	vec3 color = (diffuse + specular) * ao;
 
 	out_Color = vec4(color,1.0);
 
@@ -181,7 +173,10 @@ void main(void) {
 	out_Color = vec4(gammaCorrection(out_Color.rgb),1.0);
 
 	//-- Debug --//
+		// out_Color = vec4(gammaCorrection((N + 1.0) * 0.5),1.0);
+		// out_Color = vec4(gammaCorrection((V + 1.0) * 0.5),1.0);
 		// out_Color = vec4(vec3(G(N, V, V, (roughness*roughness)/2.0)),1.0);
+		// out_Color = vec4(F(N,V,F0),1.0);
 
 		// out_Color = vec4(gammaCorrection(texture(pbr.enviroment,N).rgb),1.0);
 		// out_Color = vec4(gammaCorrection(irradiance),1.0);
@@ -189,11 +184,9 @@ void main(void) {
 		// out_Color = vec4(specular,1.0);
 		// out_Color = vec4(diffuse,1.0);
 		// out_Color = vec4(L0,1.0);
+		out_Color = vec4(vec3(dot(N,V)),1.0);
 
-		// out_Color = vec4(F0,1.0);
-		// out_Color = vec4((N + 1.0) * 0.5,1.0);
-
-		// out_Color = vec4(albedo,1.0);
+		// out_Color = vec4(gammaCorrection(albedo),1.0);
 		// out_Color = vec4(vec3(roughness),1.0);
 		// out_Color = vec4(vec3(metalness),1.0);
 		// out_Color = vec4(vec3(ao),1.0);

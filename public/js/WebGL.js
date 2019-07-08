@@ -168,30 +168,6 @@ class Cube{
 }
 
 class Loader {
-	createModel(id,vertices,indices,textureCoords,normals){
-		let vao = gl.createVertexArray();
-		gl.bindVertexArray(vao);
-		this.storeData(0,3,vertices);
-		this.storeData(1,2,textureCoords);
-		this.storeData(2,3,normals);
-		gl.bindVertexArray(null);
-		let indexBuffer = this.indexBuffer(indices);
-		return new Model(id,vao,indexBuffer,indices.length);
-	}
-	storeData(index,size,data){
-		let buff = gl.createBuffer(gl.ARRAY_BUFFER);
-		gl.bindBuffer(gl.ARRAY_BUFFER,buff);
-		gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);
-		gl.vertexAttribPointer(index,size,gl.FLOAT,false,0,0);
-		gl.bindBuffer(gl.ARRAY_BUFFER,null);
-	}
-	indexBuffer(indices){
-		let buff = gl.createBuffer(gl.ELEMENT_ARRAY_BUFFER);
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buff);
-		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indices),gl.STATIC_DRAW);
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,null);
-		return buff;
-	}
 	async loadObj(id, filename) {
 		return await fetch(filename).then(res => {
 			const td = new TextDecoder('utf-8');
@@ -206,12 +182,12 @@ class Loader {
 				.then(file => {
 					file = file.trim() + '\n';
 					const lines = file.split('\n');
-					
+
 					let vertices = new Array();
 					let textures = new Array();
 					let normals = new Array();
 					let indices = new Array();
-					
+
 					let sortedVertices = new Array();
 					let sortedTextures = new Array();
 					let sortedNormals = new Array();
@@ -245,28 +221,27 @@ class Loader {
 								break;
 						}
 					});
-
 					for (let i = 0; i < indices.length; i++) {
 						let index = indices[i];
 						let currentVertex = vertices[index.vertex];
 						let currentTexture = textures[index.texture];
 						let currentNormal = normals[index.normal];
-
 						if (index.hashCode in indexMap) {
 							sortedIndices.push(indexMap[index.hashCode]);
 						} else {
 							indexMap[index.hashCode] = sortedVertices.length / 3;
 							sortedIndices.push(sortedVertices.length / 3);
-
 							sortedVertices.push(currentVertex[0], currentVertex[1], currentVertex[2]);
-							if(currentTexture)
+							if (currentTexture)
 								sortedTextures.push(currentTexture[0], 1 - currentTexture[1]);
-							if(currentNormal)
+							if (currentNormal)
 								sortedNormals.push(currentNormal[0], currentNormal[1], currentNormal[2]);
 						}
 					}
 
-					return this.createModel(id, sortedVertices, sortedIndices, sortedTextures, sortedNormals);
+					// let attributes = new Array({});
+					// let primitives = new Array(new Primitive());
+					// return (id, primitives);
 				})
 				.catch(e => {
 					console.error(e)
@@ -274,6 +249,21 @@ class Loader {
 		});
 	}
 
+	static storeDataInVao(index,size,data){
+		let buff = gl.createBuffer(gl.ARRAY_BUFFER);
+		gl.bindBuffer(gl.ARRAY_BUFFER,buff);
+		gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);
+		gl.vertexAttribPointer(index,size,gl.FLOAT,false,0,0);
+		gl.bindBuffer(gl.ARRAY_BUFFER,null);
+	}
+	static createIndexBuffer(data){
+		let buff = gl.createBuffer(gl.ELEMENT_ARRAY_BUFFER);
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buff);
+		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(data), gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,null);
+		return buff;
+	}
+	
 	static loadTexture(textureUrl){
 		return new Promise((resolve,error) => {
 			const textureID = gl.createTexture();
@@ -309,7 +299,6 @@ class Loader {
 		gl.bindTexture(gl.TEXTURE_2D, null);
 		return texture;
 	}
-
 	static createEmptyEnviromentMap(resolution) {
 		const textureID = gl.createTexture();
 		gl.bindTexture(gl.TEXTURE_CUBE_MAP, textureID);
@@ -400,28 +389,8 @@ class Loader {
 			img.src = textureUrl;
 		})
 	}
-	static loadEnviromentMapTGA(textureUrls) {
-		return new Promise(resolve => {
-			const textureID = gl.createTexture();
-			let tga = new TGA();
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP, textureID);
-			for (let i = 0; i < 6; i++) {
-				fetch(textureUrls[i]).then(res => {
-					let data = new Uint8Array(res.arrayBuffer());
-					tga.load(data);
-					let img = tga.getCanvas();
-					gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, gl.RGBA, img.width, img.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
-				});
-			}
-			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
-			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-			gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-			gl.bindTexture(gl.TEXTURE_2D, null)
-		});
-	}
 }
+
 // Shaders
 	class ShaderProgram {
 		constructor(vertexSource,fragmentSource){
@@ -478,9 +447,10 @@ class Loader {
 			super(vertexSource,fragmentSource);
 		}
 		bindAttributes(){
-			super.bindAttribute(0,'position');
-			super.bindAttribute(1,'texture');
-			super.bindAttribute(2,'normal');
+			super.bindAttribute(0, 'position');
+			super.bindAttribute(1, 'texture');
+			super.bindAttribute(2, 'normal');
+			super.bindAttribute(3, 'tangent');
 		}
 		getAllUniformLocations(){
 			this.location_transformationMatrix = super.getUniformLocation('transformationMatrix');
@@ -502,7 +472,7 @@ class Loader {
 			for(let i = 0;i < 10;i++){
 				this.location_lights[i] = {
 					color:super.getUniformLocation('lights['+i+'].color'),
-					position:super.getUniformLocation('lightPositions['+i+']'),
+					position: super.getUniformLocation('lights['+i+'].position'),
 					brightness:super.getUniformLocation('lights['+i+'].brightness')
 				}
 			}
@@ -519,69 +489,6 @@ class Loader {
 		}
 		loadLights(lights){
 			for(let i = 0;i < 10;i++){
-				if(lights[i]){
-					super.loadVector(this.location_lights[i].color, lights[i].color);
-					super.loadVector(this.location_lights[i].position, lights[i].position);
-					super.loadFloat(this.location_lights[i].brightness, lights[i].brightness)
-				}
-			}
-		}
-		loadTransformationMatrix(matrix){
-			super.loadMatrix(this.location_transformationMatrix,matrix);
-		}
-		loadProjectionMatrix(matrix){
-			super.loadMatrix(this.location_projectionMatrix,matrix);
-		}
-		loadViewMatrix(matrix){
-			super.loadMatrix(this.location_viewMatrix,matrix);
-		}
-	}
-	class TerrainShader extends ShaderProgram {
-		constructor(vertexSource,fragmentSource){
-			super(vertexSource,fragmentSource);
-		}
-		bindAttributes(){
-			super.bindAttribute(0,'position');
-			super.bindAttribute(1,'texture');
-			super.bindAttribute(2,'normal');
-		}
-		getAllUniformLocations(){
-			this.location_transformationMatrix = super.getUniformLocation('transformationMatrix');
-			this.location_projectionMatrix = super.getUniformLocation('projectionMatrix');
-			this.location_viewMatrix = super.getUniformLocation('viewMatrix');
-			this.location_material = {
-				normalMap:super.getUniformLocation('material.normalMap'),
-				diffuseMap:super.getUniformLocation('material.diffuseMap'),
-				metalnessMap:super.getUniformLocation('material.metalnessMap'),
-				roughnessMap:super.getUniformLocation('material.roughnessMap'),
-				occlusionMap:super.getUniformLocation('material.occlusionMap')
-			}
-			this.location_pbr = {
-				enviroment:super.getUniformLocation('pbr.enviroment'),
-				irradiance:super.getUniformLocation('pbr.irradiance'),
-				prefiltered:super.getUniformLocation('pbr.prefiltered')
-			}
-			this.location_lights = [];
-			for(let i = 0;i < 20;i++){
-				this.location_lights[i] = {
-					color:super.getUniformLocation('lights['+i+'].color'),
-					position:super.getUniformLocation('lightPositions['+i+']'),
-					brightness:super.getUniformLocation('lights['+i+'].brightness')
-				}
-			}
-		}
-		linkTextures(){
-			super.loadInt(this.location_material.diffuseMap,0);
-			super.loadInt(this.location_material.normalMap,1);
-			super.loadInt(this.location_material.metalnessMap,2);
-			super.loadInt(this.location_material.roughnessMap,3);
-			super.loadInt(this.location_material.occlusionMap,4);
-			super.loadInt(this.location_pbr.enviroment,5);
-			super.loadInt(this.location_pbr.irradiance,6);
-			super.loadInt(this.location_pbr.prefiltered,7);
-		}
-		loadLights(lights){
-			for(let i = 0;i < 20;i++){
 				if(lights[i]){
 					super.loadVector(this.location_lights[i].color, lights[i].color);
 					super.loadVector(this.location_lights[i].position, lights[i].position);
@@ -690,101 +597,61 @@ class Loader {
 			// gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.cbo, 0);
 			// gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.dbo);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+			
 			this.currentScene = scene;
 			let viewMatrix = createViewMatrix(this.currentScene.camera);
+			
 			this.shaders.staticShader.start();
 			this.shaders.staticShader.loadLights(this.currentScene.lights);
 			this.shaders.staticShader.loadViewMatrix(viewMatrix);
 			for(let entity of scene.entities){
 				this.renderEntity(entity);
 			}
-			this.shaders.terrainShader.start();
-			this.shaders.terrainShader.loadLights(this.currentScene.lights);
-			this.shaders.terrainShader.loadViewMatrix(viewMatrix);
-			for(let terrain of scene.terrains){
-				this.renderTerrain(terrain)
-			}
 			this.shaders.skyboxShader.start();
 			this.shaders.skyboxShader.loadViewMatrix(viewMatrix);
 			if(this.currentScene.skybox)
 				this.renderSkyBox(this.currentScene.skybox);
 			this.currentScene = null;
+
 			// gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 			// Renderer.renderTexturedQuad(this.cbo);
 		}
 		renderEntity(entity){
-			const model = entity.model;
-			let transformationMatrix = createTransformationMatrix(entity.position,entity.rotation,entity.scale);
+			const transformationMatrix = createTransformationMatrix(entity.position,entity.rotation,entity.scale);
 			
 			this.shaders.staticShader.start();
 			this.shaders.staticShader.linkTextures();
 			this.shaders.staticShader.loadTransformationMatrix(transformationMatrix);
 
-			gl.activeTexture(gl.TEXTURE0);
-			gl.bindTexture(gl.TEXTURE_2D,model.material.diffuseMap);
-			gl.activeTexture(gl.TEXTURE1);
-			gl.bindTexture(gl.TEXTURE_2D,model.material.normalMap);
-			gl.activeTexture(gl.TEXTURE2);
-			gl.bindTexture(gl.TEXTURE_2D,model.material.metalnessMap);
-			gl.activeTexture(gl.TEXTURE3);
-			gl.bindTexture(gl.TEXTURE_2D,model.material.roughnessMap);
-			gl.activeTexture(gl.TEXTURE4);
-			gl.bindTexture(gl.TEXTURE_2D,model.material.occlusionMap);
-			gl.activeTexture(gl.TEXTURE5);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP,this.currentScene.skybox.enviromentMap);
-			gl.activeTexture(gl.TEXTURE6);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP,model.material.irradianceMap.textureID);
-			gl.activeTexture(gl.TEXTURE7);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP,model.material.prefilteredMap.textureID);
-
-			gl.bindVertexArray(model.vao);
-			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.indexBuffer);
-			gl.enableVertexAttribArray(0);
-			gl.enableVertexAttribArray(1);
-			gl.enableVertexAttribArray(2);
-				gl.drawElements(gl.TRIANGLES, model.vertexCount, gl.UNSIGNED_SHORT, 0);
-			gl.disableVertexAttribArray(0);
-			gl.disableVertexAttribArray(1);
-			gl.disableVertexAttribArray(2);
-			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,null);
-			gl.bindVertexArray(null);
-		}
-		renderTerrain(terrain){
-			let model = terrain.model;
-			let transformationMatrix = createTransformationMatrix(terrain.position,new Vector3f(0,0,0),1);
-			
-			this.shaders.terrainShader.start();
-			this.shaders.terrainShader.linkTextures();
-			this.shaders.terrainShader.loadTransformationMatrix(transformationMatrix);
-
-			gl.activeTexture(gl.TEXTURE0);
-			gl.bindTexture(gl.TEXTURE_2D,model.material.diffuseMap);
-			gl.activeTexture(gl.TEXTURE1);
-			gl.bindTexture(gl.TEXTURE_2D,model.material.normalMap);
-			gl.activeTexture(gl.TEXTURE2);
-			gl.bindTexture(gl.TEXTURE_2D,model.material.metalnessMap);
-			gl.activeTexture(gl.TEXTURE3);
-			gl.bindTexture(gl.TEXTURE_2D,model.material.roughnessMap);
-			gl.activeTexture(gl.TEXTURE4);
-			gl.bindTexture(gl.TEXTURE_2D,model.material.occlusionMap);
-			gl.activeTexture(gl.TEXTURE5);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP,this.currentScene.skybox.enviromentMap);
-			gl.activeTexture(gl.TEXTURE6);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP,model.material.irradianceMap.textureID);
-			gl.activeTexture(gl.TEXTURE7);
-			gl.bindTexture(gl.TEXTURE_CUBE_MAP,model.material.prefilteredMap.textureID);
-
-			gl.bindVertexArray(model.vao);
-			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.indexBuffer);
-			gl.enableVertexAttribArray(0);
-			gl.enableVertexAttribArray(1);
-			gl.enableVertexAttribArray(2);
-				gl.drawElements(gl.TRIANGLES, model.vertexCount, gl.UNSIGNED_SHORT, 0);
-			gl.disableVertexAttribArray(0);
-			gl.disableVertexAttribArray(1);
-			gl.disableVertexAttribArray(2);
-			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,null);
-			gl.bindVertexArray(null);
+			for (let p of entity.mesh.primitives) {
+				gl.activeTexture(gl.TEXTURE0);
+				gl.bindTexture(gl.TEXTURE_2D, p.material.diffuseMap);
+				gl.activeTexture(gl.TEXTURE1);
+				gl.bindTexture(gl.TEXTURE_2D, p.material.normalMap);
+				gl.activeTexture(gl.TEXTURE2);
+				gl.bindTexture(gl.TEXTURE_2D, p.material.metalnessMap);
+				gl.activeTexture(gl.TEXTURE3);
+				gl.bindTexture(gl.TEXTURE_2D, p.material.roughnessMap);
+				gl.activeTexture(gl.TEXTURE4);
+				gl.bindTexture(gl.TEXTURE_2D, p.material.occlusionMap);
+				
+				gl.activeTexture(gl.TEXTURE5);
+				gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.currentScene.skybox.enviromentMap);
+				gl.activeTexture(gl.TEXTURE6);
+				gl.bindTexture(gl.TEXTURE_CUBE_MAP, p.material.irradianceMap.textureID);
+				gl.activeTexture(gl.TEXTURE7);
+				gl.bindTexture(gl.TEXTURE_CUBE_MAP, p.material.prefilteredMap.textureID);
+	
+				gl.bindVertexArray(p.vao);
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.indexBuffer);
+				for (let i of p.usedAttributes)
+					gl.enableVertexAttribArray(i);
+				gl.drawElements(gl.TRIANGLES, p.vertexCount, gl.UNSIGNED_SHORT, 0);
+				for (let i of p.usedAttributes)
+					gl.disableVertexAttribArray(i);
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,null);
+				gl.bindVertexArray(null);
+			}
 		}
 		renderSkyBox(skybox){
 			this.shaders.skyboxShader.start();
@@ -959,7 +826,6 @@ class Loader {
 	class Scene{
 		constructor(){
 			this.entities = [];
-			this.terrains = [];
 			this.lights = [];
 			this.camera = new Camera();
 			this.skybox = new Skybox(null);
@@ -972,9 +838,6 @@ class Loader {
 		}
 		addEntity(entity){
 			this.entities.push(entity);
-		}
-		addTerrain(terrain){
-			this.terrains.push(terrain);
 		}
 		addLight(light){
 			this.lights.push(light);
@@ -1174,114 +1037,82 @@ class Loader {
 			}
 		}
 	}
-	class Terrain{
-		constructor(gridX,gridZ){
-			this.w = 1024;
-			this.vertexCount = 128;
-			this.x = gridX * this.w;
-			this.z = gridZ * this.w;
-			this.model = this.generate();
-
-			this.position = new Vector3f(this.x,0,this.z);
-			this.rotation = new Vector3f(0,0,0);
-			this.scale = 1;
-		}
-
-		generate(){
-			let count = this.vertexCount * this.vertexCount;
-			let vertices = new Array(count);
-			let normals  = new Array(count);
-			let textureCoords = new Array(count);
-			let indices = new Array(6 * (this.vertexCount - 1) * (this.vertexCount - 1));
-			let vertexPointer = 0;
-			for(let i = 0; i < this.vertexCount; i++){
-				for(let j = 0; j  < this.vertexCount; j++){
-					vertices[vertexPointer*3] = j / (this.vertexCount - 1) * this.w;
-					vertices[vertexPointer*3+1] = 0;
-					vertices[vertexPointer*3+2] = i / (this.vertexCount - 1) * this.w;
-					normals[vertexPointer*3] = 0;
-					normals[vertexPointer*3+1] = 1;
-					normals[vertexPointer*3+2] = 0;
-					textureCoords[vertexPointer*2] = j / (this.vertexCount - 1);
-					textureCoords[vertexPointer*2+1] = i / (this.vertexCount - 1);
-					vertexPointer++;
-				}
-			}
-			let pointer = 0;
-			for(let gz = 0; gz < this.vertexCount-1; gz++){
-				for(let gx = 0; gx < this.vertexCount-1; gx++){
-					let topLeft = (gz * this.vertexCount) + gx;
-					let topRight = topLeft + 1;
-					let bottomLeft = ((gz+1) * this.vertexCount) + gx;
-					let bottomRight = bottomLeft + 1;
-					indices[pointer++] = topLeft;
-					indices[pointer++] = bottomLeft;
-					indices[pointer++] = topRight;
-					indices[pointer++] = topRight;
-					indices[pointer++] = bottomLeft;
-					indices[pointer++] = bottomRight;
-				}
-			}
-			return loader.createModel(vertices,indices,textureCoords,normals);
-		}
-	}
 
 // Entities
 	class Material {
-		constructor(diffuseMap,normalMap,metalnessMap,roughnessMap,occlusionMap){			
+		constructor(diffuseMap, normalMap, metalnessMap, roughnessMap, occlusionMap) {
 			this.diffuseMap   = diffuseMap   || Loader.createTextureFromColor(new Vector3f(0.8, 0.8, 0.8));
 			this.normalMap    = normalMap    || Loader.createTextureFromColor(new Vector3f(0.5, 0.5, 1.0));
 			this.metalnessMap = metalnessMap || Loader.createTextureFromColor(new Vector3f(0.0, 0.0, 0.0));
-			this.roughnessMap = roughnessMap || Loader.createTextureFromColor(new Vector3f(0.25,0.0, 0.0));
+			this.roughnessMap = roughnessMap || Loader.createTextureFromColor(new Vector3f(0.0, 0.0, 0.0));
 			this.occlusionMap = occlusionMap || Loader.createTextureFromColor(new Vector3f(1.0, 1.0, 1.0));
 			this.irradianceMap = new IrradianceMap();
 			this.prefilteredMap = new PrefilteredMap();
 		}
-		setIrradianceMap(texture){
+		setIrradianceMap(texture) {
 			if (texture) this.irradianceMap = texture;
 		}
-		setPrefilteredMap(texture){
+		setPrefilteredMap(texture) {
 			if (texture) this.prefilteredMap = texture;
 		}
-		setDiffuseMap(texture){
+		setDiffuseMap(texture) {
 			if (texture) this.diffuseMap = texture;
 		}
-		setNormalMap(texture){
+		setNormalMap(texture) {
 			if (texture) this.normalMap = texture;
 		}
-		setMetalnessMap(texture){
+		setMetalnessMap(texture) {
 			if (texture) this.metalnessMap = texture;
 		}
-		setRoughnessMap(texture){
+		setRoughnessMap(texture) {
 			if (texture) this.roughnessMap = texture;
 		}
-		setOcclusionMap(texture){
+		setOcclusionMap(texture) {
 			if (texture) this.occlusionMap = texture;
 		}
-	}
-	class Model {
-		constructor(id,vao,indexBuffer,vertexCount){
-			this.id = id;
-			this.vao = vao;
-			this.indexBuffer = indexBuffer;
-			this.vertexCount = vertexCount || 0;
-			this.material = new Material();
+		copy() {
+			return new Material(this.diffuseMap, this.normalMap, this.metalnessMap, this.roughnessMap, this.occlusionMap);
 		}
-		setMaterial(material){
+	}
+	class Primitive {
+		constructor(attributes, indices, vertexCount, material) {
+			this.vao = gl.createVertexArray();
+			this.indexBuffer = Loader.createIndexBuffer(indices.data);
+			this.vertexCount = vertexCount;
+			this.usedAttributes = [];
+			this.material = material || new Material();
+			gl.bindVertexArray(this.vao);
+			for(let i in attributes){
+				this.usedAttributes.push(i);
+				Loader.storeDataInVao(i,attributes[i].size,attributes[i].data);
+			}
+			gl.bindVertexArray(null);
+		}
+		setMaterial(material) {
 			this.material = material;
 		}
-		copy(){
-			return new Model(this.id,this.vao,this.indexBuffer,this.vertexCount);
+	}
+	class Mesh {
+		constructor(id,primitives){
+			this.id = id;
+			this.primitives = primitives;
+		}
+		setIrradianceMap(map){
+			for (let p of this.primitives) p.material.setIrradianceMap(map);
+		}
+		setPrefilteredMap(map){
+			for (let p of this.primitives) p.material.setPrefilteredMap(map);
 		}
 	}
 	class Entity {
-		constructor(model,position,rotation,scale){
-			this.model = model;
-			this.position = position;
-			this.rotation = rotation;
+		constructor(mesh,position,rotation,scale){
+			if (!mesh) throw new TypeError("Failed to construct 'Entity': 1 arguments required, but only 0 present.")
+			this.mesh = mesh;
+			this.position = position || new Vector3f();
+			this.rotation = rotation || new Vector3f();
+			this.scale = scale || 1.0;
 			this.velocity = new Vector3f();
 			this.acceleration = new Vector3f();
-			this.scale = scale;
 		}
 		collide(target){
 			let dist = Math.abs(Math.sqrt(
@@ -1318,6 +1149,7 @@ class Loader {
 			this.rotation.z += dz;
 		}
 	}
+
 	class Camera{
 		constructor(anchor){
 			this.position = new Vector3f(0,0,0);
@@ -1353,15 +1185,15 @@ class Loader {
 		}
 	}
 	class Player {
-		constructor(x,y,z){
-			this.position = new Vector3f(x,y,z);
-			this.rotation = new Vector3f(0,0,0);
+		constructor(position){
+			this.position = position || new Vector3f();
+			this.rotation = new Vector3f();
 			this.velocity = new Vector3f();
 			this.acceleration = new Vector3f();
-			this.anchorPoint = new Vector3f(x,y,z);
+			this.anchorPoint = position ? position.copy() : new Vector3f();
 
 			this.crouched = false;
-			this.viewHeight = 1.75
+			this.viewHeight = 1.8;
 			this.crouchHeight = 1.5;
 
 			this.movementSpeed = 100;
@@ -1428,16 +1260,18 @@ class Loader {
 			}
 
 			this.anchorPoint.x = this.position.x;
+			this.anchorPoint.y = this.position.y + this.viewHeight;
 			this.anchorPoint.z = this.position.z;
-			if(this.crouched){
-				this.anchorPoint.y += ((this.position.y + this.crouchHeight) - this.anchorPoint.y) * 0.1;
-			} else {
-				if(this.position.y == 0) {
-					this.anchorPoint.y += ((this.position.y + this.viewHeight) - this.anchorPoint.y) * 0.1;
-				} else {
-					this.anchorPoint.y = this.position.y + this.viewHeight;
-				}
-			}
+
+			// if(this.crouched){
+			// 	this.anchorPoint.y += ((this.position.y + this.crouchHeight) - this.anchorPoint.y) * 0.1;
+			// } else {
+			// 	if(this.position.y == 0) {
+			// 		this.anchorPoint.y += ((this.position.y + this.viewHeight) - this.anchorPoint.y) * 0.1;
+			// 	} else {
+			// 		this.anchorPoint.y = this.position.y + this.viewHeight;
+			// 	}
+			// }
 		}
 		getPosition(){
 			return this.position.copy();

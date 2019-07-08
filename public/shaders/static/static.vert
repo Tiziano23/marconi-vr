@@ -3,29 +3,33 @@
 in vec3 position;
 in vec2 texture;
 in vec3 normal;
+in vec3 tangent;
 
-out vec2 pass_texture;
-out vec3 pass_position;
-out vec3 surfaceNormal;
-out vec3 toCameraVector;
-out vec3 toLightVecs[20];
+out vec3 V;
+out vec3 T;
+out mat3 TBN;
+out vec2 textureCoords;
 
 uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
 uniform mat4 transformationMatrix;
-uniform vec3 lightPositions[20];
 
 void main() {
 	vec4 worldPosition = transformationMatrix * vec4(position,1.0);
 	
-	pass_position = worldPosition.xyz;
-	pass_texture  = texture;
-	surfaceNormal = (transformationMatrix * vec4(normal,0.0)).xyz;
-	
-	for(int i = 0;i < 20;i++){
-		toLightVecs[i] = (lightPositions[i] - worldPosition.xyz);
-	}
+	textureCoords = texture;
 
-	toCameraVector = ((inverse(viewMatrix) * vec4(0.0,0.0,0.0,1.0)).xyz - worldPosition.xyz);
+	vec3 N = normalize((transformationMatrix * vec4(normal,  0.0)).xyz);
+	vec3 T = normalize((transformationMatrix * vec4(tangent, 0.0)).xyz);
+	vec3 B = normalize(cross(N,T));
+
+	TBN = mat3(
+		T.x,B.x,N.x,
+		T.y,B.y,N.y,
+		T.z,B.z,N.z
+	);
+
+	V = (inverse(viewMatrix) * worldPosition).xyz;
+
 	gl_Position = projectionMatrix * viewMatrix * worldPosition;
 }
