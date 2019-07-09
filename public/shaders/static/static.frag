@@ -173,6 +173,7 @@ void main(void) {
 	out_Color = vec4(gammaCorrection(out_Color.rgb),1.0);
 
 	//-- Debug --//
+		// out_Color = vec4(gammaCorrection((T + 1.0) * 0.5),1.0);
 		// out_Color = vec4(gammaCorrection((N + 1.0) * 0.5),1.0);
 		// out_Color = vec4(gammaCorrection((V + 1.0) * 0.5),1.0);
 		// out_Color = vec4(vec3(G(N, V, V, (roughness*roughness)/2.0)),1.0);
@@ -186,6 +187,7 @@ void main(void) {
 		// out_Color = vec4(diffuse,1.0);
 		// out_Color = vec4(L0,1.0);
 
+		// out_Color = vec4(normalMap,1.0);
 		// out_Color = vec4(gammaCorrection(albedo),1.0);
 		// out_Color = vec4(vec3(roughness),1.0);
 		// out_Color = vec4(vec3(metalness),1.0);

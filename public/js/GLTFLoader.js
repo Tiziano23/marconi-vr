@@ -30,11 +30,15 @@ class GLTFLoader {
                     scene.buffers.push(await this.fetchBuffer(`${getPath(url)}/${buf.uri}`));
                 }
             }
-            for (let img of gltf.images) {
-                scene.images.push(this.parseImage(img, gltf, scene));
+            if (gltf.images){
+                for (let img of gltf.images) {
+                    scene.images.push(this.parseImage(img, gltf, scene));
+                }
             }
-            for (let mat of gltf.materials) {
-                scene.materials.push(this.parseMaterial(mat, gltf, scene));
+            if (gltf.materials) {
+                for (let mat of gltf.materials) {
+                    scene.materials.push(this.parseMaterial(mat, gltf, scene));
+                }
             }
             for (let mesh of gltf.meshes) {
                 let name = mesh.name || 'Mesh';
@@ -88,7 +92,7 @@ class GLTFLoader {
             let textureIndex = gltf.textures[data.pbrMetallicRoughness.baseColorTexture.index].source;
             material.setDiffuseMap(scene.images[textureIndex].texture);
         } else if (data.pbrMetallicRoughness.baseColorFactor) {
-            material.setDiffuseMap(Loader.createTextureFromColor(new Vector3f(materialData.pbrMetallicRoughness.baseColorFactor)));
+            material.setDiffuseMap(Loader.createTextureFromColor(new Vector3f(data.pbrMetallicRoughness.baseColorFactor)));
         }
         if (data.pbrMetallicRoughness.metallicRoughnessTexture) {
             let textureIndex = gltf.textures[data.pbrMetallicRoughness.metallicRoughnessTexture.index].source;

@@ -212,10 +212,10 @@ async function preload(){
 	});
 
 	notifier.notify('Loading scene');
-	sceneData = await new GLTFLoader().load("res/models/scene.gltf");
+	sceneData = await new GLTFLoader().load("res/models/dragon.gltf");
 
 	notifier.notify('Loading enviroment');
-	window.enviromentMap = await Loader.loadEnviromentMapHDR('res/skybox/indoor/2k.hdr');
+	window.enviromentMap = await Loader.loadEnviromentMapHDR('res/hdr/indoor/2k.hdr');
 	// window.enviromentMap = Loader.createEnviromentMap(64,new Vector3f(0.6,0.8,1.0),new Vector3f(1,1,1));
 	window.precomputedIrradianceMap = new IrradianceMap(window.enviromentMap);
 	window.precomputedPrefilteredMap = new PrefilteredMap(window.enviromentMap);
