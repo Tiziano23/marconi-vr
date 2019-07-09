@@ -239,60 +239,17 @@ function main(){
 
 	const skybox = new Skybox(window.enviromentMap);
 
-	for (let node of sceneData.nodes) {
-		node.mesh.setIrradianceMap(precomputedIrradianceMap);
-		node.mesh.setPrefilteredMap(precomputedPrefilteredMap);
-	}
-
 	scene.on('skyboxUpdated',() => {
 		window.precomputedIrradianceMap.setEnviromentMap(scene.skybox.enviromentMap);
 		window.precomputedPrefilteredMap.setEnviromentMap(scene.skybox.enviromentMap);
 	});
 
 	// Entities
-		for (let node of sceneData.nodes)
+		for (let node of sceneData.nodes){
+			node.mesh.setIrradianceMap(precomputedIrradianceMap);
+			node.mesh.setPrefilteredMap(precomputedPrefilteredMap);
 			scene.addEntity(node);
-
-		// const floor = new Entity(models.floor,new Vector3f(0,0,0),new Vector3f(),1);
-		// floor.model.material.setNormalMap(models.floor.textures['normal']);
-		// floor.model.material.setDiffuseMap(models.floor.textures['albedo']);
-		// floor.model.material.setRoughnessMap(models.floor.textures['roughness']);
-		// floor.model.material.setOcclusionMap(models.floor.textures['occlusion']);
-		// scene.addEntity(floor);
-	
-		// const blackboard = new Entity(models.blackboard,new Vector3f(0,6.5,-49.5),new Vector3f(),1);
-		// blackboard.model.material.setDiffuseMap(models.blackboard.textures['albedo']);
-		// blackboard.model.material.setRoughnessMap(models.blackboard.textures['roughness']);
-		// scene.addEntity(blackboard);
-
-		// const teacherDesk = new Entity(models.teacherDesk,new Vector3f(0,0,-35),new Vector3f(0,Math.PI,0),1);
-		// teacherDesk.model.material.setDiffuseMap(models.teacherDesk.textures['albedo']);
-		// teacherDesk.model.material.setRoughnessMap(models.teacherDesk.textures['roughness']);
-		// scene.addEntity(teacherDesk);
-
-		// const teacherChair = new Entity(models.chair,new Vector3f(0,0,-37.5),new Vector3f(),1);
-		// teacherChair.model.material.setDiffuseMap(models.chair.textures['albedo']);
-		// teacherChair.model.material.setRoughnessMap(models.chair.textures['roughness']);
-		// scene.addEntity(teacherChair);
-
-		// const notes = new Entity(models.sheet,new Vector3f(-4,4,-33.5),new Vector3f(0,Math.PI/8,0),1);
-		// notes.model.material.setDiffuseMap(models.sheet.textures['albedo']);
-		// notes.model.material.setRoughnessMap(Loader.createTextureFromColor(new Vector3f(1.0)));
-		// scene.addEntity(notes);
-
-		// const origin = new Vector3f(-5,0,10);
-		// for(let i = -2;i <= 2;i++){
-		// 	for(let j = -2;j <= 2;j++){
-		// 		let d = new Entity(models.desk,new Vector3f(origin.x+i*10,origin.y,origin.z+j*10),new Vector3f(),1);
-		// 		let c = new Entity(models.chair,new Vector3f(origin.x+i*10,origin.y,origin.z+j*10+2),new Vector3f(0,Math.PI,0),1);
-		// 		d.model.material.setDiffuseMap(models.desk.textures['albedo']);
-		// 		d.model.material.setRoughnessMap(models.desk.textures['roughness']);
-		// 		scene.addEntity(d);
-		// 		c.model.material.setDiffuseMap(models.chair.textures['albedo']);
-		// 		c.model.material.setRoughnessMap(models.chair.textures['roughness']);
-		// 		scene.addEntity(c);
-		// 	}
-		// }
+		}
 	// Lights
 		// scene.addLight(new PointLight(new Vector3f(-40,35,-40),new Vector3f(1,0,0),10));
 		// scene.addLight(new PointLight(new Vector3f(-40,35, 40),new Vector3f(0,1,0),10));

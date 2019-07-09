@@ -264,37 +264,9 @@ class Loader {
 		return buff;
 	}
 	
-	static loadTexture(textureUrl){
-		return new Promise((resolve,error) => {
-			const textureID = gl.createTexture();
-			gl.bindTexture(gl.TEXTURE_2D,textureID);
-			gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
-			let img = new Image();
-			img.src = textureUrl;
-			img.onload = () => {
-				gl.bindTexture(gl.TEXTURE_2D, textureID);
-				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, img.width, img.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-				if (gl.getExtension('EXT_texture_filter_anisotropic')) {
-					let ext = gl.getExtension('EXT_texture_filter_anisotropic');
-					let amount = Math.min(4, gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT));
-					gl.texParameterf(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, amount);
-				}
-				gl.generateMipmap(gl.TEXTURE_2D);
-				gl.bindTexture(gl.TEXTURE_2D, null);
-				resolve(textureID)
-			}
-			img.onerror = () => {
-				error({msg:'Unable to load texture: file not found!'});
-			}
-		});
-	}
 	static createTextureFromColor(color) {
-		const texture = gl.createTexture();
-		gl.bindTexture(gl.TEXTURE_2D, texture);
+		const texture = new Texture();
+		gl.bindTexture(gl.TEXTURE_2D, texture.id);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255 * color.x, 255 * color.y, 255 * color.z, 255]));
 		gl.bindTexture(gl.TEXTURE_2D, null);
 		return texture;
@@ -625,15 +597,15 @@ class Loader {
 
 			for (let p of entity.mesh.primitives) {
 				gl.activeTexture(gl.TEXTURE0);
-				gl.bindTexture(gl.TEXTURE_2D, p.material.diffuseMap);
+				gl.bindTexture(gl.TEXTURE_2D, p.material.diffuseMap.id);
 				gl.activeTexture(gl.TEXTURE1);
-				gl.bindTexture(gl.TEXTURE_2D, p.material.normalMap);
+				gl.bindTexture(gl.TEXTURE_2D, p.material.normalMap.id);
 				gl.activeTexture(gl.TEXTURE2);
-				gl.bindTexture(gl.TEXTURE_2D, p.material.metalnessMap);
+				gl.bindTexture(gl.TEXTURE_2D, p.material.metalnessMap.id);
 				gl.activeTexture(gl.TEXTURE3);
-				gl.bindTexture(gl.TEXTURE_2D, p.material.roughnessMap);
+				gl.bindTexture(gl.TEXTURE_2D, p.material.roughnessMap.id);
 				gl.activeTexture(gl.TEXTURE4);
-				gl.bindTexture(gl.TEXTURE_2D, p.material.occlusionMap);
+				gl.bindTexture(gl.TEXTURE_2D, p.material.occlusionMap.id);
 				
 				gl.activeTexture(gl.TEXTURE5);
 				gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.currentScene.skybox.enviromentMap);
@@ -1039,6 +1011,38 @@ class Loader {
 	}
 
 // Entities
+	class Texture {
+		constructor(imageUrl) {
+			this.id = gl.createTexture();
+			this.width = 1;
+			this.height = 1;
+			gl.bindTexture(gl.TEXTURE_2D, this.id);
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+			gl.bindTexture(gl.TEXTURE_2D, null);
+			if (imageUrl) this.loadImage(imageUrl);
+		}
+		loadImage(url) {
+			let img = new Image();
+			img.src = url;
+			img.onload = () => {
+				this.width = img.width;
+				this.height = img.height;
+				gl.bindTexture(gl.TEXTURE_2D, this.id);
+				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+				if (gl.getExtension('EXT_texture_filter_anisotropic')) {
+					let ext = gl.getExtension('EXT_texture_filter_anisotropic');
+					let amount = Math.min(4, gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT));
+					gl.texParameterf(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, amount);
+				}
+				gl.generateMipmap(gl.TEXTURE_2D);
+				gl.bindTexture(gl.TEXTURE_2D, null);
+			}
+		}
+	}
 	class Material {
 		constructor(diffuseMap, normalMap, metalnessMap, roughnessMap, occlusionMap) {
 			this.diffuseMap   = diffuseMap   || Loader.createTextureFromColor(new Vector3f(0.8, 0.8, 0.8));

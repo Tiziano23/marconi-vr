@@ -177,6 +177,7 @@ void main(void) {
 		// out_Color = vec4(gammaCorrection((V + 1.0) * 0.5),1.0);
 		// out_Color = vec4(vec3(G(N, V, V, (roughness*roughness)/2.0)),1.0);
 		// out_Color = vec4(F(N,V,F0),1.0);
+		// out_Color = vec4(vec3(dot(N,V)),1.0);
 
 		// out_Color = vec4(gammaCorrection(texture(pbr.enviroment,N).rgb),1.0);
 		// out_Color = vec4(gammaCorrection(irradiance),1.0);
@@ -184,7 +185,6 @@ void main(void) {
 		// out_Color = vec4(specular,1.0);
 		// out_Color = vec4(diffuse,1.0);
 		// out_Color = vec4(L0,1.0);
-		out_Color = vec4(vec3(dot(N,V)),1.0);
 
 		// out_Color = vec4(gammaCorrection(albedo),1.0);
 		// out_Color = vec4(vec3(roughness),1.0);
