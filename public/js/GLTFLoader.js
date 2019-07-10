@@ -58,8 +58,8 @@ class GLTFLoader {
                 let node = gltf.nodes[i];
                 let mesh = scene.meshes[node.mesh];
                 let position = new Vector3f(node.translation);
-                let rotation = new Vector3f(node.rotation);
-                let scale = node.scale ? node.scale[0] : 1;
+                let rotation = new Quaternion(node.rotation).toEulerAngles();
+                let scale = node.scale ? new Vector3f(node.scale) : new Vector3f(1,1,1);
                 scene.nodes.push(new Entity(mesh, position, rotation, scale));
             }
             return scene;

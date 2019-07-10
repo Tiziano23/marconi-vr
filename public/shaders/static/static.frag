@@ -102,8 +102,10 @@ void main(void) {
 	float metalness = texture(material.metalnessMap,textureCoords).r;
 	float roughness = texture(material.roughnessMap,textureCoords).r;
 	float ao        = texture(material.occlusionMap,textureCoords).r;
-
-	vec3 N = inverse(TBN) * normalMap;
+	
+	vec3 T = vec3(TBN[0][0],TBN[1][0],TBN[2][0]);
+	vec3 N = vec3(TBN[0][2],TBN[1][2],TBN[2][2]);
+	if(normalMap.r != 0.0 && normalMap.g != 0.0 && normalMap.b != 1.0) N = inverse(TBN) * normalMap;
 	vec3 V = normalize(V);
 	vec3 R = reflect(-V,N);
 
@@ -178,7 +180,6 @@ void main(void) {
 		// out_Color = vec4(gammaCorrection((V + 1.0) * 0.5),1.0);
 		// out_Color = vec4(vec3(G(N, V, V, (roughness*roughness)/2.0)),1.0);
 		// out_Color = vec4(F(N,V,F0),1.0);
-		// out_Color = vec4(vec3(dot(N,V)),1.0);
 
 		// out_Color = vec4(gammaCorrection(texture(pbr.enviroment,N).rgb),1.0);
 		// out_Color = vec4(gammaCorrection(irradiance),1.0);

@@ -212,7 +212,7 @@ async function preload(){
 	});
 
 	notifier.notify('Loading scene');
-	sceneData = await new GLTFLoader().load("res/models/dragon.gltf");
+	sceneData = await new GLTFLoader().load("res/models/scene.gltf");
 
 	notifier.notify('Loading enviroment');
 	window.enviromentMap = await Loader.loadEnviromentMapHDR('res/hdr/indoor/2k.hdr');
@@ -233,7 +233,7 @@ function main(){
 	window.vrRenderer = new VRRenderer(shaders);
 	
 	window.scene  = new Scene();
-	window.player = new Player(new Vector3f(0,0,5));
+	window.player = new Player();
 	window.camera = new Camera();
 	camera.setViewAnchor(player);
 
