@@ -1,14 +1,11 @@
 #version 300 es
 precision mediump float;
-
 in vec3 vertexPosition;
 out vec4 out_Color;
-
+uniform int resolution;
 uniform float roughness;
 uniform samplerCube enviromentMap;
-
 const float PI = 3.14159265359;
-
 //-- BRDF --//
 	float D(vec3 n, vec3 h, float a){	
 		float alpha2 = pow(a,2.0);
@@ -45,15 +42,12 @@ const float PI = 3.14159265359;
 
 	    return sampleVec;
 	}
-
 vec3 Li(vec3 w, float mipLevel){
 	return textureLod(enviromentMap,w,mipLevel).rgb;
 }
-
 void main(void){
 	vec3 N = normalize(vertexPosition);
 	vec3 V = N;
-
 	const int SAMPLE_COUNT = 512;
 	vec3 prefiltered = vec3(0.0);
 	float weight = 0.0;
@@ -61,22 +55,18 @@ void main(void){
 		vec3 H = ImportanceSampleGGX(Hammersley(i, SAMPLE_COUNT),N,roughness);
 		vec3 L = reflect(-V,H);
 		float NdotL = max(dot(N,L),0.0);
-		
 		if(NdotL > 0.0){
 			float NdotH = max(dot(N,H),0.0);
 			float HdotV = max(dot(H,V),0.0);
 			float pdf = (D(N,H,roughness) * NdotH / max(4.0 * HdotV,0.0001));
-
-			float res = 4096.0;
+			float res = float(resolution);
 			float saTexel  = 4.0 * PI / (6.0 * res * res);
 			float saSample = 1.0 / max(float(SAMPLE_COUNT) * pdf,0.0001);
 			float mipLevel = roughness == 0.0 ? 0.0 : 0.5 * log2(saSample / saTexel);
-
 			prefiltered += Li(L,mipLevel) * NdotL;
 			weight += NdotL;
 		}
 	}
 	prefiltered /= weight;
-
 	out_Color = vec4(prefiltered,1.0);
 }

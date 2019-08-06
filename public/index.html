@@ -6,16 +6,16 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.0/css/all.css" integrity="sha384-lZN37f5QGtY3VHgisS14W3ExzMWZxybE1SJSEsQp9S+oqd12jhcu+A56Ebc1zFSJ" crossorigin="anonymous">
 	<link rel="stylesheet" href="css/style.css">
-	<link rel="stylesheet" href="css/loader.css">
-	
+	<link rel="stylesheet" href="css/loading-screen.css">
 	<title>Marconi VR</title>
-
 	<script src="js/lib/gl-matrix.js"></script>
 	<script src="js/lib/socket.io.js"></script>
 	<script src="js/lib/hdrpng.min.js"></script>
+	<script src="js/lib/webgl/WebGL.js"></script>
+	<script src="js/lib/webgl/GLTFLoader.js"></script>
 </head>
 <body>
-	<div id="loader">
+	<div id="loading-screen">
 		<div class="spinner">
 			<div class="sphere">
 				<span class="segment"></span>
@@ -23,31 +23,52 @@
 				<span class="segment"></span>
 			</div>
 		</div>
-		<div class="background"></div>
+		<div class="backdrop"></div>
 	</div>
-	<div class="popup" id="streamer">
-		<div class="content">
-			<h1 class="title">Remote Controller</h1>
-			<button class="close" onclick="streamer.closeFrame()"><i class="fas fa-times"></i></button>
-			<p id="local-id"></p>
-			<p id="connected-client"></p>
-			<div class="section">
-				<p class="title">Available clients <i class="fas fa-redo-alt loader"></i></p>
-				<ul id="client-list"></ul>
+	<div id="sidebar" tab="menu">
+		<div class="header">
+			<h1 class="title">Marconi VR</h1>
+		</div>
+		<div class="tabs">
+			<div class="tab" tab-id="menu">
+				<nav class="menu">
+					<div class="item" id="open-streamer">
+						<p><i class="fas fa-gamepad"></i><span class="text">Position streaming</span></p>
+					</div>
+					<div class="item" id="enable-vr">
+						<p><i class="fas fa-vr-cardboard"></i><span class="text">Enter VR</span></p>
+					</div>
+				</nav>
+			</div>
+			<div class="tab" tab-id="vr-devices">
+				<h2 class="subtitle">Available Headsets</h2>
+				<div class="available-hmds"></div>
 			</div>
 		</div>
-		<li class="client-list-item"><i class="fas fa-chevron-right"></i><span class="name"></span><span class="id"></span></li>
 	</div>
-	<p id="fps-display">0.00</p>
+	<div id="main-window">
+		<div class="popup" id="streamer">
+			<div class="content">
+				<h1 class="title">Remote Controller</h1>
+				<button class="close" onclick="streamer.closeFrame()"><i class="fas fa-times"></i></button>
+				<p id="local-id"></p>
+				<p id="connected-client"></p>
+				<div class="section">
+					<p class="title">Available clients <i class="fas fa-redo-alt loader"></i></p>
+					<ul id="client-list"></ul>
+				</div>
+			</div>
+			<li class="client-list-item"><i class="fas fa-chevron-right"></i><span class="name"></span><span class="id"></span></li>
+		</div>
+		<p id="fps-display">0.00</p>
+		<canvas id="display"></canvas>
+	</div>
 	<div id="notifications"></div>
-	<button onclick="WebVRToggle()" class="floating-btn" id="enable-vr"><i class="fas fa-vr-cardboard"></i></button>
-	<button onclick="streamer.toggleFrame()" class="floating-btn" id="open-streamer"><i class="fas fa-gamepad"></i></button>
-	<canvas id="display"></canvas>
-	
+	<button id="toggle-sidebar"><i class="fas fa-bars"></i></button>
 	<script src="js/notifier.js"></script>
-	<script src="js/gui.js"></script>
-	<script src="js/GLTFLoader.js"></script>
-	<script src="js/WebGL.js"></script>
+	<script src="js/streamer.js"></script>
+	<script src="js/vr-manager.js"></script>
+	<script src="js/gamepad-manager.js"></script>
 	<script src="js/main.js"></script>
 </body>
 </html>
