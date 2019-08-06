@@ -19,23 +19,38 @@ const precomputedIrradianceMap = new IrradianceMap();
 const precomputedPrefilteredMap = new PrefilteredMap();
 let sceneData;
 
+const chalk  = new Brush(new Vector3f(), new Color(1,1,1), 3, (t) => {
+	return new Bezier(0,1,1,1,0,0,1,0).get(t).y;
+});
+const eraser = new Brush(new Vector3f(), new Color(0.02,0.02,0.02), 25, (x) => {
+	return 1
+});
+const drawingContext = new DrawingContext(1024, {
+	minX: 0.035,
+	maxX: 3.020,
+	minY: 0.963,
+	maxY: 2.244,
+	minZ: -4.750,
+	maxZ: -4.425
+},new Color(0.02,0.02,0.02));
+
 const keyboard = {
 	keys:{},
 	register:{},
 	pressed:false,
 	getKey:(code) => {
-		return keyboard.keys[code] || {pressed:false,touched:false,timestamp:0};
+		return keyboard.keys[code] || {pressed:false,once:false,timestamp:0};
 	},
 	update:() => {
 		for(let code in keyboard.register){
 			let reg = keyboard.register[code];
-			if(!keyboard.keys[code])keyboard.keys[code] = {pressed:false,touched:false,timestamp:0};
+			if(!keyboard.keys[code])keyboard.keys[code] = {pressed:false,once:false,timestamp:0};
 			if(reg.pressed){
-				keyboard.keys[code].touched = !keyboard.keys[code].pressed;
+				keyboard.keys[code].once = !keyboard.keys[code].pressed;
 				keyboard.keys[code].pressed = true;
 			} else {
 				keyboard.keys[code].pressed = false;
-				keyboard.keys[code].touched = false;
+				keyboard.keys[code].once = false;
 			}
 			keyboard.keys[code].timestamp = reg.timestamp;
 		}
@@ -44,22 +59,18 @@ const keyboard = {
 const mouse = {
 	dx:0,
 	dy:0,
-	sensivity:0.5,
+	sensivity:5,
 	buttons:{}
 };
 const input = {
-	sensivity: 1,
+	viewSensivity: 1,
+	movementSensivity: 1,
+	viewAxis: { x: 0, y: 0 },
+	movementAxis: { x: 0, y: 0 },
 	currentDevice: 'keyboard-mouse',
-	viewAxis: {
-		x: 0,
-		y: 0
-	},
-	movementAxis: {
-		x: 0,
-		y: 0
-	},
 	update: () => {
 		keyboard.update();
+		gamepadManager.update();
 		switch (input.currentDevice) {
 			case 'keyboard-mouse':
 				if (keyboard.getKey('KeyW').timestamp > keyboard.getKey('KeyS').timestamp && keyboard.getKey('KeyW').pressed) {
@@ -82,27 +93,32 @@ const input = {
 				}
 				input.viewAxis.x = mouse.dx;
 				input.viewAxis.y = mouse.dy;
-				input.sensivity = mouse.sensivity;
+				input.viewSensivity = mouse.sensivity;
+				player.input();
+				camera.input();
 				break;
 			case 'gamepad':
-				if(gamepadManager.gamepadReady()){
-					switch (gamepadManager.activeGamepad.type) {
-						case 'Dualshock4':
-							input.movementAxis.x = gamepadManager.activeGamepad.getAxis('left-stick').x;
-							input.movementAxis.y = gamepadManager.activeGamepad.getAxis('left-stick').y;
-							break;
-						case 'Oculus Touch':
-							input.movementAxis.x = gamepadManager.activeGamepad.getAxis('thumbstick').x;
-							input.movementAxis.y = gamepadManager.activeGamepad.getAxis('thumbstick').y;
-							break;
-					}
+				switch (gamepadManager.activeGamepad.type) {
+					case 'Dualshock4':
+						input.viewAxis.x = gamepadManager.activeGamepad.getAxis('right-stick').x;
+						input.viewAxis.y = gamepadManager.activeGamepad.getAxis('right-stick').y;
+						input.movementAxis.x = gamepadManager.activeGamepad.getAxis('left-stick').x;
+						input.movementAxis.y = gamepadManager.activeGamepad.getAxis('left-stick').y;
+						input.viewSensivity = gamepadManager.activeGamepad.getAxis('right-stick').getSensivity();
+						break;
+					case 'Oculus Touch':
+						input.movementAxis.x = gamepadManager.activeGamepad.getAxis('thumbstick').x;
+						input.movementAxis.y = gamepadManager.activeGamepad.getAxis('thumbstick').y;
+						break;
 				}
+				player.input();
+				camera.input();
 				break;
 		}
-
-		if(vrManager.isPresenting){
+		if (vrManager.isPresenting) {
 			camera.setOrientation(vrManager.currentHMD.getOrientation());
 		}
+		socketUpdate();
 	}
 };
 const display = {
@@ -149,8 +165,29 @@ async function preload(){
 		shaders.sceneEnviromentShader = new SceneEnviromentShader(data.vertexSource, data.fragmentSource);
 	});
 
-	notifier.notify('Loading scene');
+	notifier.notify('Loading scene and models');
 	sceneData = await new GLTFLoader().load("res/scenes/default/scene.gltf");
+	await Loader.loadObj('Oculus Touch (Left)', `res/models/oculus_touch_v2_left/model.obj`).then(mesh => {
+		mesh.material.setDiffuseMap(new Texture('res/models/oculus_touch_v2_left/diffuse.png'));
+		mesh.material.setRoughnessMap(new Texture('res/models/oculus_touch_v2_left/roughness.png'));
+		VRManager.prototype.oculusTouchLeftMesh = mesh;
+	});
+	await Loader.loadObj('Oculus Touch (Right)', `res/models/oculus_touch_v2_right/model.obj`).then(mesh => {
+		mesh.material.setDiffuseMap(new Texture('res/models/oculus_touch_v2_right/diffuse.png'));
+		mesh.material.setRoughnessMap(new Texture('res/models/oculus_touch_v2_right/roughness.png'));
+		VRManager.prototype.oculusTouchRightMesh = mesh;
+	});
+	await Loader.loadObj('sponge','res/models/sponge.obj').then(mesh => {
+		mesh.material.setDiffuseMap(Texture.fromColor(new Color(0.8,0.8,0.8).applyGamma(2.2)));
+		mesh.material.setRoughnessMap(Texture.fromColor(new Color(0.85)));
+		eraser.setMesh(mesh);
+	});
+	await Loader.loadObj('chalk', 'res/models/chalk/model.obj').then(mesh => {
+		mesh.material.setDiffuseMap(Texture.fromColor(new Color(0.75, 0.75, 0.75).applyGamma(2.2)));
+		mesh.material.setRoughnessMap(Texture.fromColor(new Color(0.95)));
+		mesh.material.setNormalMap(new Texture('res/models/chalk/normal.png'));
+		chalk.setMesh(mesh);
+	});
 
 	notifier.notify('Loading enviroment');
 	let scene = new Scene();
@@ -174,26 +211,29 @@ function main(){
 	window.camera = new Camera();
 	camera.setViewAnchor(player);
 	// Entities
-		scene.addEntities(sceneData.nodes)
+		scene.addEntities(sceneData.nodes);
 	// Lights
-		scene.addLights(sceneData.lights)
+		scene.addLights(sceneData.lights);
 	// Camera
 		scene.setCamera(camera);
 	// Enviroment
 		scene.setIrradianceMap(precomputedIrradianceMap);
 		scene.setPrefilteredMap(precomputedPrefilteredMap);
 	//-----------//
+
+	drawingContext.addBrush(chalk);
+	drawingContext.addBrush(eraser);
+	drawingContext.setOutputTexture(scene.getEntity('Blackboard').mesh.getMaterial('Blackboard').diffuseMap);
+
 	draw();
 }
 
 function draw(options = {}){
 	display.update();
-	input.update();
-	socketUpdate();
-
 	if (!options.once) display.id = window.requestAnimationFrame(draw);
 
-	//-- Game Logic --//
+	//-- Main Logic --//
+	input.update();
 	camera.update();
 	player.update();
 
@@ -207,18 +247,36 @@ function draw(options = {}){
 
 //-- WebVR --//	
 	function drawVR(options = {}) {
-		let HMD = vrManager.currentHMD;
 		display.update();
-		input.update();
-		socketUpdate();
 		
+		let HMD = vrManager.currentHMD;
 		if (!options.once) HMD.animationFrame = HMD.display.requestAnimationFrame(drawVR);
 		HMD.updateFrameData();
-		
-		//-- Game Logic --//
+				
+		//-- Main Logic --//
+		input.update();
 		camera.update();
 		player.update();
-		
+		drawingContext.update();
+
+		if (HMD.controllers.length == 2) {
+			chalk.setPosition(HMD.controllers['right'].getPenTipPosition());
+			eraser.setPosition(HMD.controllers['right'].getPenTipPosition());
+			if (HMD.controllers['right'].getButton('trigger').pressed) {
+				if (HMD.controllers['right'].getButton('b').pressed) {
+					HMD.controllers['right'].changeMesh(chalk.mesh);
+					drawingContext.draw(chalk);
+				} else if (HMD.controllers['right'].getButton('a').pressed) {
+					HMD.controllers['right'].changeMesh(eraser.mesh);
+					drawingContext.draw(eraser);
+				} else {
+					HMD.controllers['right'].resetDefaultMesh();
+				}
+			}
+			chalk.setLastPosition(chalk.position);
+			eraser.setLastPosition(eraser.position);
+		}
+
 		//-- Rendering --//
 		vrRenderer.prepare();
 		vrRenderer.renderScene(scene, HMD);
@@ -250,8 +308,8 @@ function draw(options = {}){
 		});
 		window.addEventListener('mousemove', e => {
 			if(document.pointerLockElement === canvas || document.mozPointerLockElement === canvas){
-				mouse.dx = e.movementX; // (mouse.dx + e.movementX) / 2;
-				mouse.dy = e.movementY; // (mouse.dy + e.movementY) / 2;
+				mouse.dx = e.movementX;
+				mouse.dy = e.movementY;
 				input.currentDevice = 'keyboard-mouse';
 			}
 		});
@@ -261,7 +319,8 @@ function draw(options = {}){
 		});
 	// Keyboard
 		window.addEventListener('keydown', e => {
-			if(e.altKey)e.preventDefault();
+			if (e.altKey)e.preventDefault();
+			if (e.key == 'Escape') toggleSidebar();
 			input.currentDevice = 'keyboard-mouse';
 			if(!keyboard.register[e.code])keyboard.register[e.code] = {};
 			keyboard.register[e.code].pressed = true;
@@ -284,7 +343,7 @@ const tabs = document.querySelectorAll('#sidebar .tabs>.tab');
 const menuItems = document.querySelectorAll('#sidebar .menu>.item');
 document.querySelector('#toggle-sidebar').addEventListener('click', () => {
 	if (sidebar.attributes['tab'].value != 'menu') sidebar.setAttribute('tab', 'menu');
-	else sidebar.classList.toggle('visible');
+	else toggleSidebar();
 });
 menuItems[0].addEventListener('click',() => {
 	if (!streamer.isFrameVisible()) {
@@ -328,3 +387,7 @@ menuItems[1].addEventListener('click', () => {
 		});
 	}
 });
+
+function toggleSidebar(){
+	sidebar.classList.toggle('visible')
+}

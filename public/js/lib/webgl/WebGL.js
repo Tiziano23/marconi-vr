@@ -44,51 +44,20 @@ const CUBE = [
 	1, -1,  1
 ];
 
-class Quaternion {
-	constructor(x, y, z, w) {
+class Vector3f {
+	constructor(x, y, z) {
 		this.x = x || 0;
 		this.y = y || 0;
 		this.z = z || 0;
-		this.w = w || 1;
 		if (x) {
-			if (x[0] == 0 ? true : x[0]) {
+			if (typeof x == 'object' && (x instanceof Array || x instanceof Uint8Array)) {
 				this.x = x[0];
 				this.y = x[1];
 				this.z = x[2];
-				this.w = x[3];
-			}
-		}
-	}
-	set(x, y, z, w) {
-		this.x = x == 0 ? x : (x || this.x);
-		this.y = y == 0 ? y : (y || this.y);
-		this.z = z == 0 ? z : (z || this.z);
-		this.w = w == 0 ? w : (w || this.w);
-		return this;
-	}
-	arr(){
-		return [this.x,this.y,this.z,this.w];
-	}
-	copy() {
-		return new Quaternion(this.x,this.y,this.z,this.w);
-	}
-	toEulerAngles(){
-		let yaw = Math.asin(2 * (this.w * this.y - this.z * this.x));
-		let roll = Math.atan2(2 * (this.w * this.z + this.x * this.y), 1 - 2 * (this.y * this.y + this.z * this.z));
-		let pitch = Math.atan2(2 * (this.w * this.x + this.y * this.z), 1 - 2 * (this.x * this.x + this.y * this.y));
-		return new Vector3f(pitch,yaw,roll);
-	}
-}
-class Vector3f{
-	constructor(x,y,z) {
-		this.x = x || 0;
-		this.y = y || 0;
-		this.z = z || 0;
-		if(x){
-			if(x[0] == 0 ? true : x[0]){
-				this.x = x[0];
-				this.y = x[1];
-				this.z = x[2];
+			} else if (typeof x == 'object' && x instanceof Vector3f) {
+				this.x = x.x;
+				this.y = x.y;
+				this.z = x.z;
 			}
 		}
 	}
@@ -116,11 +85,17 @@ class Vector3f{
 		this.z = Math.pow(this.z, fac);
 		return this;
 	}
-	set(x,y,z) {
-		this.x = x == 0 ? x : (x || this.x);
-		this.y = y == 0 ? y : (y || this.y);
-		this.z = z == 0 ? z : (z || this.z);
-		return this;
+	set(x, y, z) {
+		if (typeof x == 'object' && x instanceof Vector3f) {
+			this.x = arguments[0].x;
+			this.y = arguments[0].y;
+			this.z = arguments[0].z;
+		} else {
+			this.x = x == 0 ? x : (x || this.x);
+			this.y = y == 0 ? y : (y || this.y);
+			this.z = z == 0 ? z : (z || this.z);
+			return this;
+		}
 	}
 	setX(x) {
 		this.x = x == 0 ? x : (x || this.x);
@@ -134,22 +109,284 @@ class Vector3f{
 		this.z = z == 0 ? z : (z || this.z);
 		return this;
 	}
-	norm() {
-		let len = 1 / Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
-		this.mult(len);
+	flipX() {
+		this.x *= -1;
 		return this;
 	}
-	arr(){
-		return [this.x,this.y,this.z];
+	flipY() {
+		this.y *= -1;
+		return this;
+	}
+	flipZ() {
+		this.z *= -1;
+		return this;
+	}
+	limit(max) {
+		if (this.length() > max) this.normalize().mult(max);
+		return this;
+	}
+	normalize() {
+		let mag = this.length();
+		this.mult(1/mag);
+		return this;
+	}
+	length(){
+		return Math.sqrt(this.x ** 2 + this.y ** 2 + this.z ** 2);
+	}
+	applyQuaternion(q) {
+		var x = this.x, y = this.y, z = this.z;
+		var qx = q.x, qy = q.y, qz = q.z, qw = q.w;
+		// calculate quat * vector
+		var ix = qw * x + qy * z - qz * y;
+		var iy = qw * y + qz * x - qx * z;
+		var iz = qw * z + qx * y - qy * x;
+		var iw = - qx * x - qy * y - qz * z;
+		// calculate result * inverse quat
+		this.x = ix * qw + iw * - qx + iy * - qz - iz * - qy;
+		this.y = iy * qw + iw * - qy + iz * - qx - ix * - qz;
+		this.z = iz * qw + iw * - qz + ix * - qy - iy * - qx;
+		return this;
+	}
+
+	arr() {
+		return [this.x, this.y, this.z];
 	}
 	copy() {
 		return new Vector3f(this.x, this.y, this.z);
 	}
-	toString(){
+	toString() {
 		return `Vector3f {x:${this.x}, y:${this.y}, z:${this.z}}`;
+	}
+
+	static lerp(a,b,t){
+		if (t == 0) return a.copy();
+		if (t == 1) return b.copy();
+		let result = new Vector3f();
+		result.x = ((1 - t) * a.x) + (t * b.x);
+		result.y = ((1 - t) * a.y) + (t * b.y);
+		result.z = ((1 - t) * a.z) + (t * b.z);
+		return result;
+	}
+}
+class Quaternion {
+	constructor(x, y, z, w) {
+		this.x = x || 0;
+		this.y = y || 0;
+		this.z = z || 0;
+		this.w = w || 1;
+		if (x) {
+			if (x[0] == 0 ? true : x[0]) {
+				this.x = x[0];
+				this.y = x[1];
+				this.z = x[2];
+				this.w = x[3];
+			}
+		}
+	}
+	set(x, y, z, w) {
+		if (typeof x == 'object' && x instanceof Vector3f) {
+			this.x = arguments[0].x;
+			this.y = arguments[0].y;
+			this.z = arguments[0].z;
+			this.w = arguments[0].w;
+		} else {
+			this.x = x == 0 ? x : (x || this.x);
+			this.y = y == 0 ? y : (y || this.y);
+			this.z = z == 0 ? z : (z || this.z);
+			this.w = w == 0 ? w : (w || this.w);
+		}
+		return this;
+	}
+	mult(r) {
+		let qw = this.w, qx = this.x, qy = this.y, qz = this.z;
+		this.w = (r.w * qw - r.x * qx - r.y * qy - r.z * qz);
+		this.x = (r.w * qx - r.x * qw - r.y * qz - r.z * qy);
+		this.y = (r.w * qy - r.x * qz - r.y * qw - r.z * qx);
+		this.z = (r.w * qz - r.x * qy - r.y * qx - r.z * qw);
+		this.normalize();
+		return this;
+	}
+	normalize() {
+		let mag = this.length();
+		this.x /= mag;
+		this.y /= mag;
+		this.z /= mag;
+		this.w /= mag;
+		return this;
+	}
+	length() {
+		return Math.sqrt(this.x**2 + this.y**2 + this.z**2 + this.w**2);
+	}
+	toEulerAngles(){
+		let yaw = Math.asin(2 * (this.w * this.y - this.z * this.x));
+		let roll = Math.atan2(2 * (this.w * this.z + this.x * this.y), 1 - 2 * (this.y * this.y + this.z * this.z));
+		let pitch = Math.atan2(2 * (this.w * this.x + this.y * this.z), 1 - 2 * (this.x * this.x + this.y * this.y));
+		return new Vector3f(pitch,yaw,roll);
+	}
+
+	arr() {
+		return [this.x, this.y, this.z, this.w];
+	}
+	copy() {
+		return new Quaternion(this.x, this.y, this.z, this.w);
+	}
+	toString() {
+		return `Quaternion {x:${this.x}, y:${this.y}, z:${this.z}, w:${this.w}}`;
+	}
+
+	static fromAxisAngle(x,y,z,a){
+		let f = Math.sin(a / 2.0);
+		let xx = x * f;
+		let yy = y * f;
+		let zz = z * f;
+		let w = Math.cos(a / 2.0);
+		return new Quaternion(xx, yy, zz, w).normalize();
+	}
+	static lerp(a, b, t) {
+		if (t == 0) return a.copy();
+		if (t == 1) return b.copy();
+		let result = new Quaternion();
+		result.x = ((1 - t) * a.x) + (t * b.x);
+		result.y = ((1 - t) * a.y) + (t * b.y);
+		result.z = ((1 - t) * a.z) + (t * b.z);
+		result.w = ((1 - t) * a.w) + (t * b.w);
+		return result;
+	}
+}
+class Color {
+	constructor(r,g,b,a){
+		this.r = r || 0;
+		this.g = g || 0;
+		this.b = b || 0;
+		this.a = a || 1;
+		if (r) {
+			if (r[0] == 0 ? true : r[0]) {
+				this.r = r[0];
+				this.g = r[1];
+				this.b = r[2];
+				this.a = r[3];
+			}
+		}
+	}
+	set(r,g,b,a) {
+		this.r = r == 0 ? r : (r || this.r);
+		this.g = g == 0 ? g : (g || this.g);
+		this.b = b == 0 ? b : (b || this.b);
+		this.a = a == 0 ? a : (a || this.a);
+		return this;
+	}
+	setR(r){
+		this.r = r == 0 ? r : (r || this.r);
+		return this;
+	}
+	setG(g) {
+		this.g = g == 0 ? g : (g || this.r);
+		return this;
+	}
+	setB(b) {
+		this.b = b == 0 ? b : (b || this.r);
+		return this;
+	}
+	setA(a) {
+		this.a = a == 0 ? a : (a || this.r);
+		return this;
+	}
+	toUnsignedInt(){
+		this.r *= 255;
+		this.g *= 255;
+		this.b *= 255;
+		this.a *= 255;
+	}
+	applyGamma(y){
+		this.r = Math.pow(this.r, 1 / y);
+		this.g = Math.pow(this.g, 1 / y);
+		this.b = Math.pow(this.b, 1 / y);
+		return this;
+	}
+	copy() {
+		return new Color(this.r, this.g, this.b, this.a);
+	}
+	toString() {
+		return `Color {r:${this.r}, g:${this.g}, b:${this.b}, a:${this.a}}`;
+	}
+	static mix(a,b,fac){
+		if (fac == 0) return a.copy();
+		else if (fac == 1) return b.copy();
+		else {
+			let result = new Color();
+			result.r = ((1 - fac) * a.r) + (fac * b.r);
+			result.g = ((1 - fac) * a.g) + (fac * b.g);
+			result.b = ((1 - fac) * a.b) + (fac * b.b);
+			return result;
+		}
 	}
 }
 
+class Texture {
+	constructor(arg1) {
+		this.id = gl.createTexture();
+		this.width = 1;
+		this.height = 1;
+		this.ready = true;
+		gl.bindTexture(gl.TEXTURE_2D, this.id);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		if (gl.getExtension('EXT_texture_filter_anisotropic')) {
+			let ext = gl.getExtension('EXT_texture_filter_anisotropic');
+			let amount = Math.min(4, gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT));
+			gl.texParameterf(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, amount);
+		}
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		if (typeof arg1 == 'string') {
+			this.loadImageUrl(arg1);
+		} else if (typeof arg1 == 'object' && arg1 instanceof Uint8Array) {
+			this.loadImageData(arg1);
+		}
+	}
+	loadImageData(data, options) {
+		this.width = Math.sqrt(data.length / 4);
+		this.height = Math.sqrt(data.length / 4);
+		gl.bindTexture(gl.TEXTURE_2D, this.id);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+		if (options.noMips) {
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		} else {
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+			gl.generateMipmap(gl.TEXTURE_2D);
+		}
+		gl.bindTexture(gl.TEXTURE_2D, null);
+	}
+	async loadImageUrl(url) {
+		this.ready = false;
+		return new Promise((resolve, error) => {
+			let img = new Image();
+			img.src = url;
+			img.onload = () => {
+				this.width = img.width;
+				this.height = img.height;
+				gl.bindTexture(gl.TEXTURE_2D, this.id);
+				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
+				gl.generateMipmap(gl.TEXTURE_2D);
+				gl.bindTexture(gl.TEXTURE_2D, null);
+				this.ready = true;
+				resolve();
+			}
+			img.onerror = e => {
+				error(e);
+			}
+		})
+	}
+	static fromColor(c) {
+		let texture = new Texture();
+		gl.bindTexture(gl.TEXTURE_2D, texture.id);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255 * c.r, 255 * c.g, 255 * c.b, 255 * c.a]));
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		return texture;
+	}
+}
 class Cube {
 	constructor(size) {
 		let model = [];
@@ -255,8 +492,12 @@ class Loader {
 						resolve(new Mesh(id,[primitive]));
 					})
 					.catch(e => {
+						console.error(e)
 						error(e);
 					});
+			}).catch(e => {
+				console.error(e);
+				error(e);
 			});
 		});
 	}
@@ -297,14 +538,6 @@ class Loader {
 		})
 	}
 	
-	static createTextureFromColor(color) {
-		const texture = new Texture();
-		gl.bindTexture(gl.TEXTURE_2D, texture.id);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255 * color.x, 255 * color.y, 255 * color.z, 255]));
-		gl.bindTexture(gl.TEXTURE_2D, null);
-		return texture;
-	}
-
 	static createEmptyCubeMap(resolution) {
 		const textureID = gl.createTexture();
 		gl.bindTexture(gl.TEXTURE_CUBE_MAP, textureID);
@@ -404,7 +637,7 @@ class Loader {
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 			for(let e of scene.entities) {
 				shader.linkTextures();
-				shader.loadTransformationMatrix(Loader.createTransformationMatrix(e.position, e.rotation, e.scale));
+				shader.loadTransformationMatrix(e.getModelMatrix());
 				for (let p of e.mesh.primitives) {
 					gl.activeTexture(gl.TEXTURE0);
 					gl.bindTexture(gl.TEXTURE_2D, p.material.diffuseMap.id);
@@ -438,26 +671,12 @@ class Loader {
 
 	static createViewMatrix(camera) {
 		let matrix = mat4.create();
-		let rotation = quat.fromValues(camera.orientation.x, camera.orientation.y, camera.orientation.z, camera.orientation.w);
-		let translation = vec3.fromValues(-camera.position.x, -camera.position.y, -camera.position.z);
-		mat4.fromRotationTranslation(matrix, rotation, translation);
+		mat4.fromRotationTranslationScaleOrigin(matrix, camera.orientation.arr(), camera.position.copy().mult(-1).arr(), [1,1,1], camera.position.arr());
 		return matrix;
 	}
 	static createProjectionMatrix(fov, aspectRatio, zNear, zFar) {
 		let matrix = mat4.create();
 		mat4.perspective(matrix, fov, aspectRatio, zNear, zFar);
-		return matrix;
-	}
-	static createTransformationMatrix(translation, rotation, scale) {
-		scale = vec3.fromValues(scale.x, scale.y, scale.z);
-		translation = vec3.fromValues(translation.x, translation.y, translation.z);
-		let matrix = mat4.create();
-		mat4.identity(matrix);
-		mat4.translate(matrix, matrix, translation);
-		mat4.rotateX(matrix, matrix, rotation.x);
-		mat4.rotateY(matrix, matrix, rotation.y);
-		mat4.rotateZ(matrix, matrix, rotation.z);
-		mat4.scale(matrix, matrix, scale);
 		return matrix;
 	}
 }
@@ -735,10 +954,10 @@ class Loader {
 			// Renderer.renderTexturedQuad(this.cbo);
 		}
 		renderEntity(entity, modelMarix){
-			let matrix = modelMarix || Loader.createTransformationMatrix(entity.position, entity.rotation, entity.scale);
+			let transformationMatrix = modelMarix || entity.getModelMatrix();
 			this.shaders.staticShader.start();
 			this.shaders.staticShader.linkTextures();
-			this.shaders.staticShader.loadTransformationMatrix(matrix);
+			this.shaders.staticShader.loadTransformationMatrix(transformationMatrix);
 			for (let p of entity.mesh.primitives) {
 				gl.activeTexture(gl.TEXTURE0);
 				gl.bindTexture(gl.TEXTURE_2D, p.material.diffuseMap.id);
@@ -834,57 +1053,55 @@ class Loader {
 			super(shaders);
 		}
 		renderScene(scene,hmd){
-			for (let c of hmd.controllers) {
-				c.entity.mesh.setIrradianceMap(scene.irradianceMap);
-				c.entity.mesh.setPrefilteredMap(scene.prefilteredMap);
-			}
 			this.currentScene = scene;
 			let invertedSTST = mat4.create();
-			let traslatedLeftViewMatrix = mat4.create();
-			let traslatedRightViewMatrix = mat4.create();
 			let negativeCameraPos = scene.camera.getPosition().setY(0).mult(-1).arr();
 			mat4.invert(invertedSTST, hmd.sittingToStandingTransform);			
 			mat4.multiply(hmd.frameData.leftViewMatrix, hmd.frameData.leftViewMatrix, invertedSTST);
 			mat4.multiply(hmd.frameData.rightViewMatrix, hmd.frameData.rightViewMatrix, invertedSTST);
-			mat4.translate(traslatedLeftViewMatrix, hmd.frameData.leftViewMatrix, negativeCameraPos);
-			mat4.translate(traslatedRightViewMatrix, hmd.frameData.rightViewMatrix, negativeCameraPos);
+			mat4.translate(hmd.frameData.leftViewMatrix, hmd.frameData.leftViewMatrix, negativeCameraPos);
+			mat4.translate(hmd.frameData.rightViewMatrix, hmd.frameData.rightViewMatrix, negativeCameraPos);
+
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+			// -- Left Eye Render -- //
 			gl.viewport(0, 0, canvas.width * 0.5, canvas.height);
 			this.shaders.staticShader.start();
 			this.shaders.staticShader.loadLights(scene.lights);
-			this.shaders.staticShader.loadViewMatrix(traslatedLeftViewMatrix);
+			this.shaders.staticShader.loadViewMatrix(hmd.frameData.leftViewMatrix);
 			this.shaders.staticShader.loadProjectionMatrix(hmd.frameData.leftProjectionMatrix);
 			for(let e of scene.entities){
 				this.renderEntity(e);
 			}
 			for (let c of hmd.controllers) {
-				this.shaders.staticShader.loadViewMatrix(hmd.frameData.leftViewMatrix);
 				this.renderEntity(c.entity, c.poseMatrix);
 			}
 			this.shaders.skyboxShader.start();
-			this.shaders.skyboxShader.loadViewMatrix(traslatedLeftViewMatrix);
+			this.shaders.skyboxShader.loadViewMatrix(hmd.frameData.leftViewMatrix);
 			this.shaders.skyboxShader.loadProjectionMatrix(hmd.frameData.leftProjectionMatrix);
 			if (scene.skybox) {
 				this.renderSkyBox(scene.skybox);
 			}
+
+			// -- Rigth Eye Render -- //
 			gl.viewport(canvas.width * 0.5, 0, canvas.width * 0.5, canvas.height);
 			this.shaders.staticShader.start();
 			this.shaders.staticShader.loadLights(scene.lights);
-			this.shaders.staticShader.loadViewMatrix(traslatedRightViewMatrix);
+			this.shaders.staticShader.loadViewMatrix(hmd.frameData.rightViewMatrix);
 			this.shaders.staticShader.loadProjectionMatrix(hmd.frameData.rightProjectionMatrix);
 			for(let e of scene.entities){
 				this.renderEntity(e);
 			}
 			for (let c of hmd.controllers) {
-				this.shaders.staticShader.loadViewMatrix(hmd.frameData.rightViewMatrix);
 				this.renderEntity(c.entity, c.poseMatrix);
 			}
 			this.shaders.skyboxShader.start();
-			this.shaders.skyboxShader.loadViewMatrix(traslatedRightViewMatrix);
+			this.shaders.skyboxShader.loadViewMatrix(hmd.frameData.rightViewMatrix);
 			this.shaders.skyboxShader.loadProjectionMatrix(hmd.frameData.rightProjectionMatrix);
 			if(this.currentScene.skybox){
 				this.renderSkyBox(scene.skybox);
 			}
+
 			this.currentScene = null;
 		}
 	}
@@ -949,6 +1166,9 @@ class Loader {
 			for (let e of this.entities) {
 				e.mesh.setPrefilteredMap(this.prefilteredMap);
 			}
+		}
+		getEntity(id){
+			return this.entities.find(e => {return e.id == id});
 		}
 	}
 
@@ -1165,81 +1385,40 @@ class Loader {
 		}
 	}
 
-// Entities
-	class Texture {
-		constructor(imageUrl) {
-			this.id = gl.createTexture();
-			this.width = 1;
-			this.height = 1;
-			this.ready = true;
-			gl.bindTexture(gl.TEXTURE_2D, this.id);
-			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-			gl.bindTexture(gl.TEXTURE_2D, null);
-			if (imageUrl) this.loadImageData(imageUrl);
-		}
-		async loadImageData(url) {
-			this.ready = false;
-			return new Promise((resolve,error) => {
-				let img = new Image();
-				img.src = url;
-				img.onload = () => {
-					this.width = img.width;
-					this.height = img.height;
-					gl.bindTexture(gl.TEXTURE_2D, this.id);
-					gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
-					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-					if (gl.getExtension('EXT_texture_filter_anisotropic')) {
-						let ext = gl.getExtension('EXT_texture_filter_anisotropic');
-						let amount = Math.min(4, gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT));
-						gl.texParameterf(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, amount);
-					}
-					gl.generateMipmap(gl.TEXTURE_2D);
-					gl.bindTexture(gl.TEXTURE_2D, null);
-					this.ready = true;
-					resolve();
-				}
-				img.onerror = e => {
-					error(e);
-				}
-			})
-		}
-	}
+// Materials
 	class Material {
-		constructor(name, diffuseMap, normalMap, occlusionMap) {
-			this.name = name;
-			this.diffuseMap   = diffuseMap   || Loader.createTextureFromColor(new Vector3f(0.8, 0.8, 0.8));
-			this.normalMap    = normalMap    || Loader.createTextureFromColor(new Vector3f(0.5, 0.5, 1));
-			this.occlusionMap = occlusionMap || Loader.createTextureFromColor(new Vector3f(1, 1, 1));
-			this.irradianceMap = new IrradianceMap();
-			this.prefilteredMap = new PrefilteredMap();
-		}
-		setIrradianceMap(texture) {
-			if (texture) this.irradianceMap = texture;
-		}
-		setPrefilteredMap(texture) {
-			if (texture) this.prefilteredMap = texture;
-		}
-		setDiffuseMap(texture) {
-			if (texture) this.diffuseMap = texture;
-		}
-		setNormalMap(texture) {
-			if (texture) this.normalMap = texture;
-		}
-		setOcclusionMap(texture) {
-			if (texture) this.occlusionMap = texture;
-		}
-		copy() {
-			return new Material(this.name, this.diffuseMap, this.normalMap, this.occlusionMap);
-		}
+	constructor(id, diffuseMap, normalMap, occlusionMap) {
+		this.id = id;
+		this.diffuseMap = diffuseMap || Texture.fromColor(new Color(0.8, 0.8, 0.8));
+		this.normalMap = normalMap || Texture.fromColor(new Color(0.5, 0.5, 1));
+		this.occlusionMap = occlusionMap || Texture.fromColor(new Color(1, 1, 1));
+		this.irradianceMap = new IrradianceMap();
+		this.prefilteredMap = new PrefilteredMap();
+	}
+	setIrradianceMap(texture) {
+		if (texture) this.irradianceMap = texture;
+	}
+	setPrefilteredMap(texture) {
+		if (texture) this.prefilteredMap = texture;
+	}
+	setDiffuseMap(texture) {
+		if (texture) this.diffuseMap = texture;
+	}
+	setNormalMap(texture) {
+		if (texture) this.normalMap = texture;
+	}
+	setOcclusionMap(texture) {
+		if (texture) this.occlusionMap = texture;
+	}
+	copy() {
+		return new Material(this.id, this.diffuseMap, this.normalMap, this.occlusionMap);
+	}
 	}
 	class PBRMaterial extends Material {
-		constructor(name, diffuseMap, normalMap, occlusionMap, metalnessMap, roughnessMap) {
-			super(name, diffuseMap, normalMap, occlusionMap);
-			this.metalnessMap = metalnessMap || Loader.createTextureFromColor(new Vector3f());
-			this.roughnessMap = roughnessMap || Loader.createTextureFromColor(new Vector3f(0.25));
+		constructor(id, diffuseMap, normalMap, occlusionMap, metalnessMap, roughnessMap) {
+			super(id, diffuseMap, normalMap, occlusionMap);
+			this.metalnessMap = metalnessMap || Texture.fromColor(new Color());
+			this.roughnessMap = roughnessMap || Texture.fromColor(new Color(0.25));
 		}
 		setMetalnessMap(texture) {
 			if (texture) this.metalnessMap = texture;
@@ -1248,17 +1427,18 @@ class Loader {
 			if (texture) this.roughnessMap = texture;
 		}
 		copy() {
-			return new PBRMaterial(this.name, this.diffuseMap, this.normalMap, this.occlusionMap, this.metalnessMap, this.roughnessMap);
+			return new PBRMaterial(this.id, this.diffuseMap, this.normalMap, this.occlusionMap, this.metalnessMap, this.roughnessMap);
 		}
 	}
 
+// Entities
 	class Primitive {
 		constructor(attributes, indices, vertexCount, material) {
 			this.vao = gl.createVertexArray();
 			this.indexBuffer = Loader.createIndexBuffer(indices.data);
 			this.vertexCount = vertexCount;
 			this.usedAttributes = [];
-			this.material = material || new PBRMaterial();
+			this.material = material || new PBRMaterial('Material');
 			gl.bindVertexArray(this.vao);
 			for(let i in attributes){
 				this.usedAttributes.push(i);
@@ -1275,46 +1455,56 @@ class Loader {
 			this.id = id;
 			this.primitives = primitives;
 		}
+		getMaterial(id){
+			return this.primitives.find(p => {return p.material.id == id}).material;
+		}
 		setIrradianceMap(map){
 			for (let p of this.primitives) p.material.setIrradianceMap(map);
 		}
 		setPrefilteredMap(map){
 			for (let p of this.primitives) p.material.setPrefilteredMap(map);
 		}
+		get material(){
+			if (this.primitives.length == 1) return this.primitives[0].material;
+		}
 	}
 	class Entity {
-		constructor(mesh,position,rotation,scale){
-			if (!mesh) throw new TypeError("Failed to construct 'Entity': 1 argument required, but only 0 present.")
+		constructor(id, mesh, position, orientation, scale){
+			if (!mesh) throw new TypeError(`Failed to construct 'Entity': 2 argument required, but only ${id?1:0} present.`)
+			this.id = id;
 			this.mesh = mesh;
-			this.position = position || new Vector3f();
-			this.rotation = rotation || new Vector3f();
 			this.scale = scale || new Vector3f(1,1,1);
+			this.position = position || new Vector3f();
+			this.orientation = orientation || new Quaternion();
+			this.rotation = this.orientation.toEulerAngles();
 			this.velocity = new Vector3f();
 			this.acceleration = new Vector3f();
 		}
-		collide(target){
-			let dist = Math.abs(Math.sqrt(
-				Math.pow(this.position.x - target.position.x,2) +
-				Math.pow(this.position.y - target.position.y,2) +
-				Math.pow(this.position.z - target.position.z,2)
-			));
-			return dist <= Math.abs(this.velocity.y + this.acceleration.y);
-		}
-		setPosition(vec){
-			this.position.x = vec.x;
-			this.position.y = vec.y;
-			this.position.z = vec.z;
+		setPosition(position){
+			this.position = position.copy();
 		}
 		getPosition(){
-			return new Vector3f(this.position.x,this.position.y,this.position.z);
+			return this.position.copy();
 		}
-		setRotation(vec){
-			this.rotation.x = vec.x;
-			this.rotation.y = vec.y;
-			this.rotation.z = vec.z;
+		setOrientation(orientation){
+			this.orientation = orientation.copy();
+		}
+		getOrientation(){
+			return this.orientation.copy();
 		}
 		getRotation(){
-			return new Vector3f(this.rotation.x,this.rotation.y,this.rotation.z);
+			return this.rotation.copy();
+		}
+		setScale(scale){
+			this.scale = scale.copy();
+		}
+		getScale() {
+			return this.scale.copy();
+		}
+		getModelMatrix(){
+			let matrix = mat4.create();
+			mat4.fromRotationTranslationScale(matrix, this.orientation.arr(), this.position.arr(), this.scale.arr());
+			return matrix;
 		}
 		increasePosition(dx,dy,dz){
 			this.position.x += dx;
@@ -1325,6 +1515,9 @@ class Loader {
 			this.rotation.x += dx;
 			this.rotation.y += dy;
 			this.rotation.z += dz;
+			this.orientation.mult(Quaternion.fromAxisAngle(1, 0, 0, this.rotation.x));
+			this.orientation.mult(Quaternion.fromAxisAngle(0, 1, 0, this.rotation.y));
+			this.orientation.mult(Quaternion.fromAxisAngle(0, 0, 1, this.rotation.z));
 		}
 	}
 
@@ -1334,6 +1527,16 @@ class Loader {
 			this.orientation = new Quaternion(0, 0, 0, 1);
 			this.anchor = anchor || null;
 			if(this.anchor)this.anchor.camera = this;
+
+			this.yaw = 0;
+			this.pitch = 0;
+		}
+		input(){
+			this.yaw += input.viewAxis.x * input.viewSensivity * (Math.PI / 180) * display.getFrameTime();
+			this.pitch += input.viewAxis.y * input.viewSensivity * (Math.PI / 180) * display.getFrameTime();
+			if (this.pitch < -Math.PI / 3) this.pitch = -Math.PI / 3;
+			else if (this.pitch > Math.PI / 3) this.pitch = Math.PI / 3;
+			this.orientation = Quaternion.fromAxisAngle(0, 1, 0, this.yaw).mult(Quaternion.fromAxisAngle(1, 0, 0, -this.pitch));
 		}
 		update(){
 			if(this.anchor){
@@ -1341,17 +1544,11 @@ class Loader {
 				this.position.y = this.anchor.anchorPoint.y;
 				this.position.z = this.anchor.anchorPoint.z;
 			}
-			// if (this.rotation.x < -Math.PI / 3)
-			// 	this.rotation.x = -Math.PI / 3;
-			// else if (this.rotation.x > Math.PI / 3)
-			// 	this.rotation.x = Math.PI / 3;
 		}
-
 		setViewAnchor(entity){
 			this.anchor = entity;
 			entity.camera = this;
 		}
-
 		getPosition(){
 			return this.position.copy();
 		}
@@ -1367,7 +1564,6 @@ class Loader {
 		getRotation() {
 			return this.orientation.toEulerAngles();
 		}
-
 		getRightVector() {
 			let x = this.orientation.x,
 				y = this.orientation.y,
@@ -1398,78 +1594,94 @@ class Loader {
 			this.anchorPoint = position ? position.copy() : new Vector3f();
 
 			this.crouched = false;
-			this.viewHeight = 1.67;
-			this.crouchHeight = 1.3;
+			this.standingHeight = 1.67;
+			this.crouchedHeight = 1.30;
+			this.cameraHeight = this.standingHeight;
 
-			this.movementSpeed = 25;
-			this.speedMtl = 1;
+			this.walkingSpeed = 1.40;
+			this.runningSpeed = 3.58;
+			this.currentSpeed = this.walkingSpeed;
 
-			this.direction = {x:0,y:0};
+			this.crouchAnimatiom = new EntityAnimation(300, [
+				new AnimationProperty(this, 'cameraHeight', [
+					new Keyframe(0, this.standingHeight),
+					new Keyframe(300, this.crouchedHeight)
+				])
+			],{
+				reverse: false,
+				easing: (t) => {
+					return new Bezier(0, 0, .71, .01, .38, .99, 1, 1).get(t).y;
+						
+				}
+			});
 		}
-		applyForce(vec){
+		applyForce(vec) {
 			this.acceleration.add(vec);
 		}
-		input(){
-			this.direction.x = input.movementAxis.x;
-			this.direction.y = input.movementAxis.y;
-
-			// if(keyboard.getKey('ShiftLeft').pressed){
-			// 	this.speedMtl = 2;
-			// } else {
-			// 	this.speedMtl = 1;
-			// }
-			// if((keyboard.getKey('Space').touched || gamepad.buttons['cross'].touched) && this.position.y == 0){
-			// 	if(this.crouched)this.crouched = false;
-			// 	else this.applyForce(new Vector3f(0,100,0));
-			// }
-			// if(gamepad.buttons['L3'].touched){
-			// 	this.speedMtl = this.speedMtl == 2 ? 1 : 2;
-			// }
-			// if((gamepad.buttons['circle'].touched || keyboard.getKey('ControlLeft').touched)&& this.position.y == 0){
-			// 	this.crouched = !this.crouched;
-			// }
+		input() {
+			switch (input.currentDevice) {
+				case 'keyboard-mouse': 
+					if (keyboard.getKey('ShiftLeft').pressed) {
+						this.currentSpeed = this.runningSpeed;
+					} else {
+						this.currentSpeed = this.walkingSpeed;
+					}
+					if(keyboard.getKey('ControlLeft').once){
+						this.crouch();
+					}
+					if (keyboard.getKey('Space').once) {
+						this.jump();
+					}
+					break;
+				case 'gamepad':
+					if (gamepadManager.activeGamepad.getButton('circle').once) {
+						this.crouch();
+					}
+					if (gamepadManager.activeGamepad.getButton('cross').once) {
+						this.jump();
+					}
+					if (gamepadManager.activeGamepad.getButton('L3').once) {
+						this.currentSpeed = this.currentSpeed == this.walkingSpeed ? this.runningSpeed : this.walkingSpeed;
+					}
+					break;
+			}
+			this.applyForce(this.camera.getRightVector().setY(0).flipZ().normalize().mult(input.movementAxis.x));
+			this.applyForce(this.camera.getForwardVector().setY(0).flipX().normalize().mult(input.movementAxis.y));
 		}
-		update(){
-			this.input();
-			
-			// Input
-			let xValue = this.direction.x * display.getFrameTime();
-			let yValue = this.direction.y * display.getFrameTime();
-			this.position.add(this.camera.getRightVector().setY(0).mult(xValue));
-			this.position.add(this.camera.getForwardVector().setY(0).mult(yValue));
-			
-			this.anchorPoint.x = this.position.x;
-			this.anchorPoint.y = this.position.y + this.viewHeight;
-			this.anchorPoint.z = this.position.z;
-
+		update() {
 			// Gravity
-			// this.applyForce(new Vector3f(0,-GRAVITY,0));
+			this.applyForce(new Vector3f(0,-GRAVITY,0));
 			// if(this.velocity.y < 0)
 			// 	this.applyForce(new Vector3f(0,2*(this.velocity.y**2),0));
-
-			// Friction
-			// this.applyForce(this.acceleration.copy().mult(-0.9));
 			
-			// this.velocity.add(this.acceleration.mult(1/60));
-			// this.position.add(this.velocity);
-			// this.velocity.mult(0.5);
-			// this.acceleration.mult(0);
+			// Friction
+			this.applyForce(new Vector3f())
+			
+			this.velocity.add(this.acceleration);
+			this.velocity.limit(this.currentSpeed);
+			this.position.add(this.velocity.copy().mult(display.getFrameTime()));
+			this.acceleration.mult(0);
 
-			// if(this.position.y < 0.1){
-			// 	this.acceleration.y = 0;
-			// 	this.velocity.y = 0;
-			// 	this.position.y = 0;
-			// }
+			// Position Constraints
+			if(this.position.y < 0){
+				this.acceleration.y = 0;
+				this.velocity.y = 0;
+				this.position.y = 0;
+			}
 
-			// if(this.crouched){
-			// 	this.anchorPoint.y += ((this.position.y + this.crouchHeight) - this.anchorPoint.y) * 0.1;
-			// } else {
-			// 	if(this.position.y == 0) {
-			// 		this.anchorPoint.y += ((this.position.y + this.viewHeight) - this.anchorPoint.y) * 0.1;
-			// 	} else {
-			// 		this.anchorPoint.y = this.position.y + this.viewHeight;
-			// 	}
-			// }
+			// Camera Anchor
+			this.anchorPoint.x = this.position.x;
+			this.anchorPoint.y = this.position.y + this.cameraHeight;
+			this.anchorPoint.z = this.position.z;
+		}
+		crouch() {
+			this.crouched = !this.crouched;
+			this.crouchAnimatiom.reverse = !this.crouched;
+			this.crouchAnimatiom.play();
+		}
+		jump() {
+			if (this.crouched) this.crouched = false;
+			else this.applyForce(new Vector3f(0, GRAVITY*2.5, 0));
 		}
 		getPosition(){
 			return this.position.copy();
@@ -1482,5 +1694,118 @@ class Loader {
 		}
 		setRotation(vec){
 			this.rotation = new Vector3f(vec.x,vec.y,vec.z);
+		}
+	}
+
+// Animations
+	Number.lerp = (a,b,t) => {
+		return (1 - t) * a + t * b;
+	}
+
+	class Timeline {
+		constructor(keyframes){
+			this.keyframes = keyframes || new Array();
+			this.keyframes.sort((a, b) => { return a.time - b.time });
+		}
+		addKeyframes(keyframes) {
+			this.keyframes = this.keyframes.concat(keyframes);
+			this.keyframes.sort((a, b) => { return a.time - b.time });
+		}
+		getPropertyValue(property, time) {
+			let resultKeyframe = this.keyframes.find(k => { return k.time == time });
+			if (resultKeyframe) return resultKeyframe.getValue();
+			else {
+				let keyframeBefore = this.keyframes.filter(k => { return k.time <= time }).pop();
+				let keyframeAfter = this.keyframes.filter(k => { return k.time >= time }).shift();
+				if (keyframeBefore && keyframeAfter) {
+					let fac = (time - keyframeBefore.time) / (keyframeAfter.time - keyframeBefore.time);
+					return property.lerp(keyframeBefore.value, keyframeAfter.value, fac);
+				} else if (keyframeBefore) {
+					return keyframeBefore.getValue();
+				} else if (keyframeAfter) {
+					return keyframeAfter.getValue();
+				}
+			}
+		}
+	}
+	class Keyframe {
+		constructor(time, value){
+			this.time = time;
+			this.value = value;
+			this.property = null;
+		}
+		setValue(val){
+			this.value = val;
+		}
+		getValue(){
+			return new this.value.constructor(this.value);
+		}
+	}
+	class AnimationProperty {
+		constructor(scope, propertyName, keyframes){
+			this.scope = scope;
+			this.propertyName = propertyName;
+			this.keyframes = keyframes;
+			this.lerp = this.scope[this.propertyName].constructor.lerp;
+			for (let k of this.keyframes) {
+				k.property = this.value;
+			}
+		}
+		setValue(value){
+			this.scope[this.propertyName] = value;
+		}
+	}
+	class EntityAnimation {
+		constructor(duration, properties, options = {}) {
+			this.duration = duration;
+			this.properties = properties;
+			this.repeat = options.repeat || false;
+			this.reverse = options.reverse || false;
+			this.easing = options.easing || ((t) => {return t});
+			this.time = 0;
+			this.frameID = 0;
+			this.state = 'stopped';
+
+			this.frameTime = performance.now();
+			this.lastFrameTime = performance.now();
+
+			this.timeline = new Timeline();
+			for (let p of this.properties) {
+				this.timeline.addKeyframes(p.keyframes);
+			}
+			this.reset();
+		}
+		frame() {
+			this.lastFrameTime = this.frameTime;
+			this.frameTime = performance.now();
+			this.time += (this.frameTime - this.lastFrameTime) * (this.reverse ? -1 : 1);
+			if (this.time > this.duration || this.time < 0){
+				this.time = this.reverse ? 0 : this.duration;
+				if (this.repeat) this.reset();
+				else this.pause();
+			} else {
+				this.frameID = requestAnimationFrame(this.frame.bind(this));
+				for (let p of this.properties) {
+					p.setValue(this.timeline.getPropertyValue(p,this.easing(this.time / this.duration) * this.duration));
+				}
+			}
+		}
+		reset(){
+			this.time = this.reverse ? this.duration : 0;
+			for (let p of this.properties) {
+				p.setValue(this.timeline.getPropertyValue(p, this.time));
+			}
+		}
+		play(){
+			this.frameTime = performance.now();
+			this.lastFrameTime = performance.now();
+			this.frame();
+		}
+		pause() {
+			cancelAnimationFrame(this.frameID);
+		}
+		stop() {
+			cancelAnimationFrame(this.frameID);
+			this.reset();
 		}
 	}

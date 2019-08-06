@@ -81,9 +81,9 @@ class GLTFLoader {
                     light.setPosition(position);
                 } else {
                     let mesh = scene.meshes[node.mesh];
-                    let rotation = new Quaternion(node.rotation).toEulerAngles();
-                    let scale = node.scale ? new Vector3f(node.scale) : new Vector3f(1,1,1);
-                    if(mesh) scene.nodes.push(new Entity(mesh, position, rotation, scale));
+                    let orientation = new Quaternion(node.rotation);
+                    let scale = node.scale ? new Vector3f(node.scale) : undefined;
+                    if (mesh) scene.nodes.push(new Entity(node.name, mesh, position, orientation, scale));
                 }
             }
             return scene;
@@ -107,7 +107,7 @@ class GLTFLoader {
             dataURI = URL.createObjectURL(new Blob([new Uint8Array(data)], {type: imageData.mimeType}));
         }
         let texture = new Texture();
-        await texture.loadImageData(dataURI);
+        await texture.loadImageUrl(dataURI);
         return {
             name: imageData.name,
             mimeType: imageData.mimeType,
@@ -127,19 +127,19 @@ class GLTFLoader {
                 let textureIndex = gltf.textures[data.pbrMetallicRoughness.baseColorTexture.index].source;
                 material.setDiffuseMap(scene.images[textureIndex].texture);
             } else if (data.pbrMetallicRoughness.baseColorFactor) {
-                material.setDiffuseMap(Loader.createTextureFromColor(new Vector3f(data.pbrMetallicRoughness.baseColorFactor.slice(0,3)).pow(1/2.2)));
+                material.setDiffuseMap(Texture.fromColor(new Color(data.pbrMetallicRoughness.baseColorFactor).applyGamma(2.2)));
             }
             if (data.pbrMetallicRoughness.metallicRoughnessTexture) {
                 let textureIndex = gltf.textures[data.pbrMetallicRoughness.metallicRoughnessTexture.index].source;
                 material.setRoughnessMap(scene.images[textureIndex].texture);
             } else if (data.pbrMetallicRoughness.roughnessFactor) {
-                material.setRoughnessMap(Loader.createTextureFromColor(new Vector3f(data.pbrMetallicRoughness.roughnessFactor)));
+                material.setRoughnessMap(Texture.fromColor(new Color(data.pbrMetallicRoughness.roughnessFactor)));
             }
             if (data.pbrMetallicRoughness.metallicTexture) {
                 let textureIndex = gltf.textures[data.pbrMetallicRoughness.metallicTexture.index].source;
                 material.setMetalnessMap(scene.images[textureIndex].texture);
             } else if (data.pbrMetallicRoughness.metallicFactor) {
-                material.setMetalnessMap(Loader.createTextureFromColor(new Vector3f(data.pbrMetallicRoughness.metallicFactor)));
+                material.setMetalnessMap(Texture.fromColor(new Color(data.pbrMetallicRoughness.metallicFactor)));
             }
         }
         return material;
